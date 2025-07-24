@@ -1,4 +1,4 @@
-## The GAN is dead; long live the GAN! A Modern Baseline GAN (R3GAN)<br><sub>Official PyTorch implementation of the NeurIPS 2024 paper</sub>
+<!-- ## The GAN is dead; long live the GAN! A Modern Baseline GAN (R3GAN)<br><sub>Official PyTorch implementation of the NeurIPS 2024 paper</sub>
 
 ![Teaser image](./doc/teaser.png)
 
@@ -88,4 +88,7 @@ url={https://openreview.net/forum?id=OrtN9hPP7V}
 
 ## Acknowledgements
 
-The authors thank Xinjie Jayden Yi for contributing to the proof and Yu Cheng for helpful discussion. For compute, the authors thank Databricks Mosaic Research. Nick Huang was supported by a Brown University Division of Research Seed Award, and James Tompkin was supported by NSF CAREER 2144956. Volodymyr Kuleshov was supported by NSF CAREER 2145577 and NIH MIRA 1R35GM15124301.
+The authors thank Xinjie Jayden Yi for contributing to the proof and Yu Cheng for helpful discussion. For compute, the authors thank Databricks Mosaic Research. Nick Huang was supported by a Brown University Division of Research Seed Award, and James Tompkin was supported by NSF CAREER 2144956. Volodymyr Kuleshov was supported by NSF CAREER 2145577 and NIH MIRA 1R35GM15124301. -->
+
+1. python -m pip install --upgrade pip
+2. pip install -r requirements.txt

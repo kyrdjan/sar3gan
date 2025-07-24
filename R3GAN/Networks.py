@@ -123,29 +123,63 @@ class DiscriminativeBasis(nn.Module):
 class GeneratorStage(nn.Module):
     def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
         super(GeneratorStage, self).__init__()
-        
-        TransitionLayer = GenerativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
-        self.Layers = nn.ModuleList([
-            TransitionLayer,
-            SelfAttention(OutputChannels),  # << here 
-            *[ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)]
-        ])
+
         self.DataType = DataType
-        
+
+        # NEW
+        if ResamplingFilter is None:
+            TransitionLayer = GenerativeBasis(InputChannels, OutputChannels)
+            self.Layers = nn.ModuleList([
+                TransitionLayer,
+                *[ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)],
+                SelfAttention(OutputChannels) # SELF ATTENTION IS HEEREEEEEEEEEEEEEEEEEEEEE -----------
+            ])
+        else:
+            TransitionLayer = UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+            self.Layers = nn.ModuleList([
+                TransitionLayer,
+                *[ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)]
+            ])
+
+        # OLD
+        # TransitionLayer = GenerativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+        # self.Layers = nn.ModuleList([TransitionLayer] + [ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)])
+  
+
     def forward(self, x):
         x = x.to(self.DataType)
-        
+
         for Layer in self.Layers:
             x = Layer(x)
-        
+
         return x
+
     
 class DiscriminatorStage(nn.Module):
     def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
         super(DiscriminatorStage, self).__init__()
         
-        TransitionLayer = DiscriminativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
-        self.Layers = nn.ModuleList([ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] + [TransitionLayer])
+        # NEW
+        if ResamplingFilter is None:
+            TransitionLayer = DiscriminativeBasis(InputChannels, OutputChannels)
+            self.Layers = nn.ModuleList(
+                [SelfAttention(InputChannels)] +
+                [ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] +
+                [TransitionLayer]
+            )
+        else:
+            TransitionLayer = DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+            self.Layers = nn.ModuleList([
+                ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] 
+                + [TransitionLayer]
+            )
+
+
+        # OLD
+        # TransitionLayer = DiscriminativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+        # self.Layers = nn.ModuleList([ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] + [TransitionLayer])
+        
+        
         self.DataType = DataType
         
     def forward(self, x):
