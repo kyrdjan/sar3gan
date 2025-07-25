@@ -1,3 +1,6 @@
 datasets/
 sar3ganve/
 training-runs/
+.conda/
+R3GAN/__pycache__/
+torch_utils/

@@ -15,3 +15,4 @@ requests
 click
 lmdb
 opencv-python
+ninja
