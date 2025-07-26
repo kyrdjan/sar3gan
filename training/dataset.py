@@ -235,4 +235,64 @@ class ImageFolderDataset(Dataset):
         labels = labels.astype({1: np.int64, 2: np.float32}[labels.ndim])
         return labels
 
+
+# ADDED EXPERIMENTAL ----------------------------------------------------------------   
+class PairedImageFolderDataset(torch.utils.data.Dataset):
+    def __init__(self,
+        path,                  # Path to a single ZIP file
+        resolution=None,       # Optional resolution check
+        low_dir='low',         # Subfolder for low-res images
+        high_dir='high',       # Subfolder for high-res images
+    ):
+        assert path.endswith('.zip'), "Only ZIP format is supported for single archive paired dataset"
+        self.path = path
+        self.zipfile = zipfile.ZipFile(path)
+        self.low_dir = low_dir.strip('/') + '/'
+        self.high_dir = high_dir.strip('/') + '/'
+
+        # List all image files in low/ and high/ subfolders
+        self.low_fnames = sorted([
+            f for f in self.zipfile.namelist()
+            if f.startswith(self.low_dir) and f.lower().endswith(('png', 'jpg', 'jpeg'))
+        ])
+        self.high_fnames = sorted([
+            f for f in self.zipfile.namelist()
+            if f.startswith(self.high_dir) and f.lower().endswith(('png', 'jpg', 'jpeg'))
+        ])
+
+        assert len(self.low_fnames) == len(self.high_fnames), "Mismatch in number of images in low/ and high/"
+        
+        # Ensure files are matched by name (e.g., 00001.png ↔ 00001.png)
+        for l, h in zip(self.low_fnames, self.high_fnames):
+            assert os.path.basename(l) == os.path.basename(h), f"Mismatch: {l} vs {h}"
+
+        # Check resolution (optional)
+        if resolution is not None:
+            h, w = resolution, resolution
+            low_img = self._load_image(self.low_fnames[0])
+            high_img = self._load_image(self.high_fnames[0])
+            assert low_img.shape[1:] == (h, w), "Low image resolution mismatch"
+            assert high_img.shape[1:] == (h, w), "High image resolution mismatch"
+        
+        self.raw_shape = [len(self.low_fnames)] + list(self._load_image(self.low_fnames[0]).shape)
+
+    def _load_image(self, fname):
+        with self.zipfile.open(fname, 'r') as f:
+            img = np.array(PIL.Image.open(f).convert('RGB'))
+        img = img.transpose(2, 0, 1)  # HWC → CHW
+        return img.astype(np.uint8)
+
+    def __getitem__(self, idx):
+        low_img = self._load_image(self.low_fnames[idx])
+        high_img = self._load_image(self.high_fnames[idx])
+        return low_img.copy(), high_img.copy()
+
+    def __len__(self):
+        return len(self.low_fnames)
+
+    def __del__(self):
+        try:
+            self.zipfile.close()
+        except:
+            pass
 #----------------------------------------------------------------------------
