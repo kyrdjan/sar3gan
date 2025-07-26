@@ -251,18 +251,19 @@ class PairedImageFolderDataset(torch.utils.data.Dataset):
         self.high_dir = high_dir.strip('/') + '/'
 
         # List all image files in low/ and high/ subfolders
-        self.low_fnames = sorted([
-            f for f in self.zipfile.namelist()
-            if f.startswith(self.low_dir) and f.lower().endswith(('png', 'jpg', 'jpeg'))
-        ])
-        self.high_fnames = sorted([
-            f for f in self.zipfile.namelist()
-            if f.startswith(self.high_dir) and f.lower().endswith(('png', 'jpg', 'jpeg'))
-        ])
+        low_all = set([os.path.basename(f) for f in self._list_images(self.low_dir) if self._is_image_file(f)])
+        high_all = set([os.path.basename(f) for f in self._list_images(self.high_dir) if self._is_image_file(f)])
 
-        assert len(self.low_fnames) == len(self.high_fnames), "Mismatch in number of images in low/ and high/"
-        
-        # Ensure files are matched by name (e.g., 00001.png ↔ 00001.png)
+        common_files = sorted(list(low_all & high_all))  # Intersection of filenames
+
+        if not common_files:
+            raise RuntimeError("No matching filenames found in low_resolution/ and high_resolution/ folders.")
+
+        self.low_fnames = [os.path.join(self.low_dir, f) for f in common_files]
+        self.high_fnames = [os.path.join(self.high_dir, f) for f in common_files]
+
+        print(f"Found {len(common_files)} matching image pairs.")
+
         for l, h in zip(self.low_fnames, self.high_fnames):
             assert os.path.basename(l) == os.path.basename(h), f"Mismatch: {l} vs {h}"
 
@@ -275,6 +276,13 @@ class PairedImageFolderDataset(torch.utils.data.Dataset):
             assert high_img.shape[1:] == (h, w), "High image resolution mismatch"
         
         self.raw_shape = [len(self.low_fnames)] + list(self._load_image(self.low_fnames[0]).shape)
+
+    def _list_images(self, folder):
+        """List all files in a zip subdirectory."""
+        return [f for f in self.zipfile.namelist() if f.startswith(folder)]
+
+    def _is_image_file(self, filename):
+        return any(filename.lower().endswith(ext) for ext in ['.png', '.jpg', '.jpeg', '.bmp'])
 
     def _load_image(self, fname):
         with self.zipfile.open(fname, 'r') as f:
