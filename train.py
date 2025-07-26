@@ -45,6 +45,8 @@ def subprocess_fn(rank, c, temp_dir):
 
 #----------------------------------------------------------------------------
 
+
+# TODO: TRACE where is desc
 def launch_training(c, desc, outdir, dry_run):
     dnnlib.util.Logger(should_flush=True)
 
@@ -67,12 +69,14 @@ def launch_training(c, desc, outdir, dry_run):
     print(f'Number of GPUs:      {c.num_gpus}')
     print(f'Batch size:          {c.batch_size} images')
     print(f'Training duration:   {c.total_kimg} kimg')
-    print(f'Dataset path:        {c.training_set_kwargs.path}')
-    print(f'Dataset size:        {c.training_set_kwargs.max_size} images')
-    print(f'Dataset resolution:  {c.training_set_kwargs.resolution}')
-    print(f'Dataset labels:      {c.training_set_kwargs.use_labels}')
-    print(f'Dataset x-flips:     {c.training_set_kwargs.xflip}')
+    print(f'Dataset path:        {c.G_training_set_kwargs.path}') # Just Generator Only
+    print(f'Dataset size:        {c.G_training_set_kwargs.max_size} images')  # Just Generator Only
+    print(f'Dataset resolution:  {c.G_training_set_kwargs.resolution}')  # Just Generator Only
+    print(f'Dataset labels:      {c.G_training_set_kwargs.use_labels}')  # Just Generator Only
+    print(f'Dataset x-flips:     {c.G_training_set_kwargs.xflip}')  # Just Generator Only
     print()
+
+    
 
     # Dry run?
     if dry_run:
@@ -98,14 +102,14 @@ def launch_training(c, desc, outdir, dry_run):
 
 def init_dataset_kwargs(data):
     try:
-        dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False)
+        dataset_kwargs = dnnlib.EasyDict(class_name='training.dataset.ImageFolderDataset', path=data, use_labels=True, max_size=None, xflip=False) # for pairing
         dataset_obj = dnnlib.util.construct_class_by_name(**dataset_kwargs) # Subclass of training.dataset.Dataset.
         dataset_kwargs.resolution = dataset_obj.resolution # Be explicit about resolution.
         dataset_kwargs.use_labels = dataset_obj.has_labels # Be explicit about labels.
         dataset_kwargs.max_size = len(dataset_obj) # Be explicit about dataset size.
         return dataset_kwargs, dataset_obj.name
     except IOError as err:
-        raise click.ClickException(f'--data: {err}')
+        raise click.ClickException(f'--g-data/--d-data: {err}')
 
 #----------------------------------------------------------------------------
 
@@ -122,7 +126,8 @@ def parse_comma_separated_list(s):
 
 # Required.
 @click.option('--outdir',       help='Where to save the results', metavar='DIR',                required=True)
-@click.option('--data',         help='Training data', metavar='[ZIP|DIR]',                      type=str, required=True)
+@click.option('--g-data',       help='Generator Training data', metavar='[ZIP|DIR]',            type=str, required=True)
+@click.option('--d-data',       help='Discriminator Training data', metavar='[ZIP|DIR]',        type=str, required=True)
 @click.option('--gpus',         help='Number of GPUs to use', metavar='INT',                    type=click.IntRange(min=1), required=True)
 @click.option('--batch',        help='Total batch size', metavar='INT',                         type=click.IntRange(min=1), required=True)
 @click.option('--preset',       help='Preset configs', metavar='STR',                           type=str, required=True)
@@ -163,17 +168,36 @@ def main(**kwargs):
     c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
 
     # Training set.
-    c.training_set_kwargs, dataset_name = init_dataset_kwargs(data=opts.data)
+    c.G_training_set_kwargs, G_dataset_name = init_dataset_kwargs(data=opts.g_data)
+    c.D_training_set_kwargs, D_dataset_name = init_dataset_kwargs(data=opts.d_data)
     if opts.cond and not c.training_set_kwargs.use_labels:
         raise click.ClickException('--cond=True requires labels specified in dataset.json')
-    c.training_set_kwargs.use_labels = opts.cond
-    c.training_set_kwargs.xflip = opts.mirror
+    c.G_training_set_kwargs.use_labels = opts.cond
+    c.G_training_set_kwargs.xflip = opts.mirror
+    c.D_training_set_kwargs.use_labels = opts.cond
+    c.D_training_set_kwargs.xflip = opts.mirror
 
     # Hyperparameters & settings.
     c.num_gpus = opts.gpus
     c.batch_size = opts.batch
     c.g_batch_gpu = opts.g_batch_gpu or opts.batch // opts.gpus
     c.d_batch_gpu = opts.d_batch_gpu or opts.batch // opts.gpus
+
+    if opts.preset == 'TEST-128':
+        WidthPerStage = [1024, 1024, 1024, 512, 256, 128]
+        BlocksPerStage = [2, 2, 2, 2, 2, 2]
+        CardinalityPerStage = [64, 64, 64, 32, 16, 8]
+        FP16Stages = [-1, -2, -3, -4]
+        ema_nimg = 500 * 1000
+        decay_nimg = 2e7
+
+        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
+        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
+        c.gamma_scheduler = { 'base_value': 2, 'final_value': 0.2, 'total_nimg': decay_nimg }
+        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+
+
     
     if opts.preset == 'CIFAR10':
         WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024]]
@@ -265,7 +289,7 @@ def main(**kwargs):
         c.gamma_scheduler = { 'base_value': 1, 'final_value': 0.1, 'total_nimg': decay_nimg }
         c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
-    c.G_kwargs.NoiseDimension = NoiseDimension
+    # c.G_kwargs.NoiseDimension = NoiseDimension 
     c.G_kwargs.WidthPerStage = WidthPerStage
     c.G_kwargs.CardinalityPerStage = CardinalityPerStage
     c.G_kwargs.BlocksPerStage = BlocksPerStage
@@ -283,7 +307,7 @@ def main(**kwargs):
     c.total_kimg = opts.kimg
     c.kimg_per_tick = opts.tick
     c.image_snapshot_ticks = c.network_snapshot_ticks = opts.snap
-    c.random_seed = c.training_set_kwargs.random_seed = opts.seed
+    c.random_seed = c.G_training_set_kwargs.random_seed = c.D_training_set_kwargs.random_seed = opts.seed
     c.data_loader_kwargs.num_workers = opts.workers
 
     # Sanity checks.
@@ -308,7 +332,7 @@ def main(**kwargs):
         c.cudnn_benchmark = False
 
     # Description string.
-    desc = f'{dataset_name:s}-gpus{c.num_gpus:d}-batch{c.batch_size:d}'
+    desc = f'{G_dataset_name:s}&{D_dataset_name:s}-gpus{c.num_gpus:d}-batch{c.batch_size:d}'
     if opts.desc is not None:
         desc += f'-{opts.desc}'
 

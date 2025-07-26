@@ -115,9 +115,11 @@ def remap_optimizer_state_dict(state_dict, device):
 
 #----------------------------------------------------------------------------
 
+#TODO: CONNECT WITH G AND D's DATASET
 def training_loop(
     run_dir                 = '.',      # Output directory.
-    training_set_kwargs     = {},       # Options for training set.
+    G_training_set_kwargs   = {},       # Options for G training set.
+    D_training_set_kwargs   = {},       # Options for G training set.
     data_loader_kwargs      = {},       # Options for torch.utils.data.DataLoader.
     G_kwargs                = {},       # Options for generator network.
     D_kwargs                = {},       # Options for discriminator network.
@@ -160,20 +162,26 @@ def training_loop(
     # Load training set.
     if rank == 0:
         print('Loading training set...')
-    training_set = dnnlib.util.construct_class_by_name(**training_set_kwargs) # subclass of training.dataset.Dataset
-    training_set_sampler = misc.InfiniteSampler(dataset=training_set, rank=rank, num_replicas=num_gpus, seed=random_seed)
-    training_set_iterator = iter(torch.utils.data.DataLoader(dataset=training_set, sampler=training_set_sampler, batch_size=batch_size//num_gpus, **data_loader_kwargs))
+
+    G_training_set = dnnlib.util.construct_class_by_name(**G_training_set_kwargs) # subclass of training.dataset.Dataset
+    G_training_set_sampler = misc.InfiniteSampler(dataset=G_training_set, rank=rank, num_replicas=num_gpus, seed=random_seed)
+    G_training_set_iterator = iter(torch.utils.data.DataLoader(dataset=G_training_set, sampler=G_training_set_sampler, batch_size=batch_size//num_gpus, **data_loader_kwargs))
+
+    D_training_set = dnnlib.util.construct_class_by_name(**D_training_set_kwargs) # subclass of training.dataset.Dataset
+    D_training_set_sampler = misc.InfiniteSampler(dataset=D_training_set, rank=rank, num_replicas=num_gpus, seed=random_seed)
+    D_training_set_iterator = iter(torch.utils.data.DataLoader(dataset=D_training_set, sampler=D_training_set_sampler, batch_size=batch_size//num_gpus, **data_loader_kwargs))
+    
     if rank == 0:
         print()
-        print('Num images: ', len(training_set))
-        print('Image shape:', training_set.image_shape)
-        print('Label shape:', training_set.label_shape)
+        print('Num images: ', len(G_training_set)+len(D_training_set))
+        print('Image shape:', G_training_set.image_shape)
+        print('Label shape:', G_training_set.label_shape)
         print()
 
     # Construct networks.
     if rank == 0:
         print('Constructing networks...')
-    common_kwargs = dict(c_dim=training_set.label_dim, img_resolution=training_set.resolution)
+    common_kwargs = dict(c_dim=G_training_set.label_dim, img_resolution=G_training_set.resolution)
     G = dnnlib.util.construct_class_by_name(**G_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
     D = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
     G_ema = copy.deepcopy(G).eval()
@@ -189,9 +197,9 @@ def training_loop(
 
     # Print network summary tables.
     if rank == 0:
-        z = torch.empty([min(g_batch_gpu, d_batch_gpu), G.z_dim], device=device)
+        z = torch.empty([min(g_batch_gpu, d_batch_gpu), G.c_dim], device=device) # Originally, G.z_dim 
         c = torch.empty([min(g_batch_gpu, d_batch_gpu), G.c_dim], device=device)
-        img = misc.print_module_summary(G, [z, c])
+        img = misc.print_module_summary(G, [z, c]) 
         misc.print_module_summary(D, [img, c])
 
     # Setup augmentation.
@@ -239,7 +247,7 @@ def training_loop(
     grid_c = None
     if rank == 0:
         print('Exporting sample images...')
-        grid_size, images, labels = setup_snapshot_image_grid(training_set=training_set)
+        grid_size, images, labels = setup_snapshot_image_grid(training_set=G_training_set)
         save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0,255], grid_size=grid_size)
         grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(g_batch_gpu)
         grid_c = torch.from_numpy(labels).to(device).split(g_batch_gpu)
@@ -284,23 +292,31 @@ def training_loop(
     while True:
         # Fetch training data.
         with torch.autograd.profiler.record_function('data_fetch'):
-            D_img, D_img_c = next(training_set_iterator)
-            D_z = torch.randn([batch_size, G.z_dim], device=device)
-            
-            G_img, G_img_c = next(training_set_iterator)
-            G_z = torch.randn([batch_size, G.z_dim], device=device)
-            
+            # D_img, D_img_c = next(training_set_iterator)
+            # D_z = torch.randn([batch_size, G.z_dim], device=device) # D_z is replaced with lr_img
+            # G_img, G_img_c = next(training_set_iterator)
+            # G_z = torch.randn([batch_size, G.z_dim], device=device)
+
+            lr_img = next(G_training_set_iterator)
+            hr_img = next(D_training_set_iterator)
+
+
+            D_img_c = torch.zeros([batch_size, G.c_dim], device=device)
+            D_z = torch.zeros([batch_size, G.z_dim], device=device)
+            G_img_c = torch.zeros([batch_size, G.c_dim], device=device)
+            G_z = torch.zeros([batch_size, G.z_dim], device=device)
+
             all_real_img = []
             all_real_c = []
             all_gen_z = []
             
             # D
-            all_real_img += [(D_img.detach().clone().to(device).to(torch.float32) / 127.5 - 1).split(d_batch_gpu)]
+            all_real_img += [(hr_img.detach().clone().to(device).to(torch.float32) / 127.5 - 1).split(d_batch_gpu)]
             all_real_c += [D_img_c.detach().clone().to(device).split(d_batch_gpu)]
             all_gen_z += [D_z.detach().clone().split(d_batch_gpu)]
             
             # G
-            all_real_img += [(G_img.detach().clone().to(device).to(torch.float32) / 127.5 - 1).split(g_batch_gpu)]
+            all_real_img += [(lr_img.detach().clone().to(device).to(torch.float32) / 127.5 - 1).split(g_batch_gpu)]
             all_real_c += [G_img_c.detach().clone().to(device).split(g_batch_gpu)]
             all_gen_z += [G_z.detach().clone().split(g_batch_gpu)]
             
@@ -402,7 +418,7 @@ def training_loop(
         snapshot_pkl = None
         snapshot_data = None
         if (network_snapshot_ticks is not None) and (done or cur_tick % network_snapshot_ticks == 0):
-            snapshot_data = dict(G=G, D=D, G_ema=G_ema, training_set_kwargs=dict(training_set_kwargs), cur_nimg=cur_nimg)
+            snapshot_data = dict(G=G, D=D, G_ema=G_ema, G_training_set_kwargs=dict(G_training_set_kwargs), D_training_set_kwargs=dict(D_training_set_kwargs), cur_nimg=cur_nimg)
             for phase in phases:
                 snapshot_data[phase.name + '_opt_state'] = remap_optimizer_state_dict(phase.opt.state_dict(), 'cpu')
             for key, value in snapshot_data.items():
@@ -425,7 +441,7 @@ def training_loop(
                 print('Evaluating metrics...')
             for metric in metrics:
                 result_dict = metric_main.calc_metric(metric=metric, G=snapshot_data['G_ema'],
-                    dataset_kwargs=training_set_kwargs, num_gpus=num_gpus, rank=rank, device=device)
+                    dataset_kwargs=D_training_set_kwargs, num_gpus=num_gpus, rank=rank, device=device) # D's dataset
                 if rank == 0:
                     metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
                 stats_metrics.update(result_dict.results)
