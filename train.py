@@ -184,112 +184,117 @@ def main(**kwargs):
     c.d_batch_gpu = opts.d_batch_gpu or opts.batch // opts.gpus
 
     if opts.preset == 'TEST-128':
-        WidthPerStage = [1024, 1024, 1024, 512, 256, 128]
-        BlocksPerStage = [2, 2, 2, 2, 2, 2]
-        CardinalityPerStage = [64, 64, 64, 32, 16, 8]
-        FP16Stages = [-1, -2, -3, -4]
-        ema_nimg = 500 * 1000
-        decay_nimg = 2e7
+        # Core architecture settings
+        WidthPerStage       = [128, 128, 128, 128]   # 4 stages
+        BlocksPerStage      = [2, 2, 2, 2]           # Same number of blocks per stage
+        CardinalityPerStage = [8, 8, 8, 4]           # Light but with some depth
+        FP16Stages          = [-1, -2]               # Use FP16 in last 2 stages (optional)
 
-        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
-        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
-        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
-        c.gamma_scheduler = { 'base_value': 2, 'final_value': 0.2, 'total_nimg': decay_nimg }
-        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+        # Training schedule
+        ema_nimg    = 200 * 1000                     # Adjust depending on dataset size
+        decay_nimg  = 10_000_000                     # 10M images for full decay
+
+        c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
+        c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.3,        'total_nimg': decay_nimg }
+        c.lr_scheduler     = { 'base_value': 2e-4, 'final_value': 5e-5,       'total_nimg': decay_nimg }
+        c.gamma_scheduler  = { 'base_value': 2.0,  'final_value': 0.2,        'total_nimg': decay_nimg }
+        c.beta2_scheduler  = { 'base_value': 0.9,  'final_value': 0.99,       'total_nimg': decay_nimg }
 
 
-    
-    if opts.preset == 'CIFAR10':
-        WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024]]
-        BlocksPerStage = [2 * x for x in [1, 1, 1, 1]]
-        CardinalityPerStage = [3 * x for x in [32, 32, 32, 32]]
-        FP16Stages = [-1, -2, -3]
-        NoiseDimension = 64
+
+    {
+    # if opts.preset == 'CIFAR10':
+    #     WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024]]
+    #     BlocksPerStage = [2 * x for x in [1, 1, 1, 1]]
+    #     CardinalityPerStage = [3 * x for x in [32, 32, 32, 32]]
+    #     FP16Stages = [-1, -2, -3]
+    #     NoiseDimension = 64
         
-        if opts.cond:
-            c.G_kwargs.ConditionEmbeddingDimension = NoiseDimension
-            c.D_kwargs.ConditionEmbeddingDimension = WidthPerStage[0]
+    #     if opts.cond:
+    #         c.G_kwargs.ConditionEmbeddingDimension = NoiseDimension
+    #         c.D_kwargs.ConditionEmbeddingDimension = WidthPerStage[0]
        
-        ema_nimg = 5000 * 1000
-        decay_nimg = 2e7
+    #     ema_nimg = 5000 * 1000
+    #     decay_nimg = 2e7
        
-        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
-        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.55, 'total_nimg': decay_nimg }
-        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
-        c.gamma_scheduler = { 'base_value': 0.05, 'final_value': 0.005, 'total_nimg': decay_nimg }
-        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+    #     c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+    #     c.aug_scheduler = { 'base_value': 0, 'final_value': 0.55, 'total_nimg': decay_nimg }
+    #     c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
+    #     c.gamma_scheduler = { 'base_value': 0.05, 'final_value': 0.005, 'total_nimg': decay_nimg }
+    #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
-    if opts.preset == 'FFHQ-64':
-        WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024, 512]]
-        BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1]]
-        CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 16]]
-        FP16Stages = [-1, -2, -3, -4]
-        NoiseDimension = 64
+    # if opts.preset == 'FFHQ-64':
+    #     WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024, 512]]
+    #     BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1]]
+    #     CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 16]]
+    #     FP16Stages = [-1, -2, -3, -4]
+    #     NoiseDimension = 64
        
-        ema_nimg = 500 * 1000
-        decay_nimg = 2e7
+    #     ema_nimg = 500 * 1000
+    #     decay_nimg = 2e7
        
-        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
-        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
-        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
-        c.gamma_scheduler = { 'base_value': 2, 'final_value': 0.2, 'total_nimg': decay_nimg }
-        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+    #     c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+    #     c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
+    #     c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
+    #     c.gamma_scheduler = { 'base_value': 2, 'final_value': 0.2, 'total_nimg': decay_nimg }
+    #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
-    if opts.preset == 'FFHQ-256':
-        WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024, 512, 256, 128]]
-        BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1, 1, 1]]
-        CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 16, 8, 4]]
-        FP16Stages = [-1, -2, -3, -4]
-        NoiseDimension = 64
+    # if opts.preset == 'FFHQ-256':
+    #     WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024, 512, 256, 128]]
+    #     BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1, 1, 1]]
+    #     CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 16, 8, 4]]
+    #     FP16Stages = [-1, -2, -3, -4]
+    #     NoiseDimension = 64
        
-        ema_nimg = 500 * 1000
-        decay_nimg = 2e7
+    #     ema_nimg = 500 * 1000
+    #     decay_nimg = 2e7
        
-        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
-        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
-        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
-        c.gamma_scheduler = { 'base_value': 150, 'final_value': 15, 'total_nimg': decay_nimg }
-        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+    #     c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+    #     c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
+    #     c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
+    #     c.gamma_scheduler = { 'base_value': 150, 'final_value': 15, 'total_nimg': decay_nimg }
+    #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
-    if opts.preset == 'ImageNet-32':
-        WidthPerStage = [6 * x // 4 for x in [1024, 1024, 1024, 1024]]
-        BlocksPerStage = [2 * x for x in [1, 1, 1, 1]]
-        CardinalityPerStage = [3 * x for x in [32, 32, 32, 32]]
-        FP16Stages = [-1, -2, -3]
-        NoiseDimension = 64
+    # if opts.preset == 'ImageNet-32':
+    #     WidthPerStage = [6 * x // 4 for x in [1024, 1024, 1024, 1024]]
+    #     BlocksPerStage = [2 * x for x in [1, 1, 1, 1]]
+    #     CardinalityPerStage = [3 * x for x in [32, 32, 32, 32]]
+    #     FP16Stages = [-1, -2, -3]
+    #     NoiseDimension = 64
        
-        c.G_kwargs.ConditionEmbeddingDimension = NoiseDimension
-        c.D_kwargs.ConditionEmbeddingDimension = WidthPerStage[0]
+    #     c.G_kwargs.ConditionEmbeddingDimension = NoiseDimension
+    #     c.D_kwargs.ConditionEmbeddingDimension = WidthPerStage[0]
        
-        ema_nimg = 50000 * 1000
-        decay_nimg = 2e8
+    #     ema_nimg = 50000 * 1000
+    #     decay_nimg = 2e8
        
-        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
-        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.5, 'total_nimg': decay_nimg }
-        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
-        c.gamma_scheduler = { 'base_value': 0.5, 'final_value': 0.05, 'total_nimg': decay_nimg }
-        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+    #     c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+    #     c.aug_scheduler = { 'base_value': 0, 'final_value': 0.5, 'total_nimg': decay_nimg }
+    #     c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
+    #     c.gamma_scheduler = { 'base_value': 0.5, 'final_value': 0.05, 'total_nimg': decay_nimg }
+    #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
-    if opts.preset == 'ImageNet-64':
-        WidthPerStage = [6 * x // 4 for x in [1024, 1024, 1024, 1024, 1024]]
-        BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1]]
-        CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 32]]
-        FP16Stages = [-1, -2, -3, -4]
-        NoiseDimension = 64
+    # if opts.preset == 'ImageNet-64':
+    #     WidthPerStage = [6 * x // 4 for x in [1024, 1024, 1024, 1024, 1024]]
+    #     BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1]]
+    #     CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 32]]
+    #     FP16Stages = [-1, -2, -3, -4]
+    #     NoiseDimension = 64
         
-        c.G_kwargs.ConditionEmbeddingDimension = NoiseDimension
-        c.D_kwargs.ConditionEmbeddingDimension = WidthPerStage[0]
+    #     c.G_kwargs.ConditionEmbeddingDimension = NoiseDimension
+    #     c.D_kwargs.ConditionEmbeddingDimension = WidthPerStage[0]
         
-        ema_nimg = 50000 * 1000
-        decay_nimg = 2e8
+    #     ema_nimg = 50000 * 1000
+    #     decay_nimg = 2e8
         
-        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
-        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.4, 'total_nimg': decay_nimg }
-        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
-        c.gamma_scheduler = { 'base_value': 1, 'final_value': 0.1, 'total_nimg': decay_nimg }
-        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+    #     c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+    #     c.aug_scheduler = { 'base_value': 0, 'final_value': 0.4, 'total_nimg': decay_nimg }
+    #     c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
+    #     c.gamma_scheduler = { 'base_value': 1, 'final_value': 0.1, 'total_nimg': decay_nimg }
+    #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
-    # c.G_kwargs.NoiseDimension = NoiseDimension 
+    # c.G_kwargs.NoiseDimension = NoiseDimension   
+    }
     c.G_kwargs.WidthPerStage = WidthPerStage
     c.G_kwargs.CardinalityPerStage = CardinalityPerStage
     c.G_kwargs.BlocksPerStage = BlocksPerStage
@@ -345,3 +350,7 @@ if __name__ == "__main__":
     main() # pylint: disable=no-value-for-parameter
 
 #----------------------------------------------------------------------------
+
+
+
+

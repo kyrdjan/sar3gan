@@ -76,7 +76,7 @@ class Generator(nn.Module):
             self.Model.MainLayers[x].DataType = torch.bfloat16
 
     def forward(self, lr_image, c=None):
-        # NOTE: Assuming the Generator can take an image instead of z
+    
         return self.Model(lr_image, c)
 
 
@@ -98,4 +98,5 @@ class Discriminator(nn.Module):
             self.Model.MainLayers[x].DataType = torch.bfloat16
         
     def forward(self, hr_image, c=None):
+
         return self.Model(hr_image, c)

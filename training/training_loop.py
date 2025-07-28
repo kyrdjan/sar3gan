@@ -195,11 +195,16 @@ def training_loop(
             for name, module in [('G', G), ('D', D), ('G_ema', G_ema)]:
                 misc.copy_params_and_buffers(resume_data[name], module, require_all=False)
 
+
+
     # Print network summary tables.
     if rank == 0:
-        z = torch.empty([min(g_batch_gpu, d_batch_gpu), G.c_dim], device=device) # Originally, G.z_dim 
-        c = torch.empty([min(g_batch_gpu, d_batch_gpu), G.c_dim], device=device)
-        img = misc.print_module_summary(G, [z, c]) 
+        lr_shape = G_training_set[0][0].shape
+        n_lr_img = torch.empty([1, *lr_shape], device=device)
+        c = torch.empty([1, G.c_dim], device=device)
+        # print('c =', c)
+        img = misc.print_module_summary(G, [n_lr_img, c])
+        # print('img =',img)
         misc.print_module_summary(D, [img, c])
 
     # Setup augmentation.
@@ -241,17 +246,20 @@ def training_loop(
             phase.start_event = torch.cuda.Event(enable_timing=True)
             phase.end_event = torch.cuda.Event(enable_timing=True)
 
+
+    # TODO: NEED TO FIX THE CODE BELOW
     # Export sample images.
     grid_size = None
-    grid_z = None
+    grid_lr = None
     grid_c = None
-    if rank == 0:
+    if rank == 0: # how to fix this
         print('Exporting sample images...')
         grid_size, images, labels = setup_snapshot_image_grid(training_set=G_training_set)
         save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0,255], grid_size=grid_size)
-        grid_z = torch.randn([labels.shape[0], G.z_dim], device=device).split(g_batch_gpu)
+        grid_lr = torch.stack([G_training_set[i][0] for i in range(len(labels))]).to(device).split(g_batch_gpu)
         grid_c = torch.from_numpy(labels).to(device).split(g_batch_gpu)
-        images = torch.cat([G_ema(z, c).cpu() for z, c in zip(grid_z, grid_c)]).to(torch.float).numpy()
+        images = torch.cat([G_ema(lr, c).cpu() for lr, c in zip(grid_lr, grid_c)]).to(torch.float).numpy()
+
         save_image_grid(images, os.path.join(run_dir, 'fakes_init.png'), drange=[-1,1], grid_size=grid_size)
 
     # Initialize logs.
@@ -290,62 +298,48 @@ def training_loop(
             phase.end_event.record(torch.cuda.current_stream(device))
         
     while True:
-        # Fetch training data.
+        # Fetch paired LR-HR training data.
         with torch.autograd.profiler.record_function('data_fetch'):
-            # D_img, D_img_c = next(training_set_iterator)
-            # D_z = torch.randn([batch_size, G.z_dim], device=device) # D_z is replaced with lr_img
-            # G_img, G_img_c = next(training_set_iterator)
-            # G_z = torch.randn([batch_size, G.z_dim], device=device)
+            lr_img, label = next(G_training_set_iterator)
+            hr_img, _ = next(D_training_set_iterator)
+            lr_img = lr_img.to(device).to(torch.float32).split(g_batch_gpu)  # No normalization
+            hr_img = hr_img.to(device).to(torch.float32).split(d_batch_gpu)  # No normalization
+            label = label.to(device).split(g_batch_gpu)
 
-            lr_img = next(G_training_set_iterator)
-            hr_img = next(D_training_set_iterator)
-
-
-            D_img_c = torch.zeros([batch_size, G.c_dim], device=device)
-            D_z = torch.zeros([batch_size, G.z_dim], device=device)
-            G_img_c = torch.zeros([batch_size, G.c_dim], device=device)
-            G_z = torch.zeros([batch_size, G.z_dim], device=device)
-
-            all_real_img = []
-            all_real_c = []
-            all_gen_z = []
-            
-            # D
-            all_real_img += [(hr_img.detach().clone().to(device).to(torch.float32) / 127.5 - 1).split(d_batch_gpu)]
-            all_real_c += [D_img_c.detach().clone().to(device).split(d_batch_gpu)]
-            all_gen_z += [D_z.detach().clone().split(d_batch_gpu)]
-            
-            # G
-            all_real_img += [(lr_img.detach().clone().to(device).to(torch.float32) / 127.5 - 1).split(g_batch_gpu)]
-            all_real_c += [G_img_c.detach().clone().to(device).split(g_batch_gpu)]
-            all_gen_z += [G_z.detach().clone().split(g_batch_gpu)]
-            
+        # Update schedulers.
         cur_lr = cosine_decay_with_warmup(cur_nimg, **lr_scheduler)
         cur_beta2 = cosine_decay_with_warmup(cur_nimg, **beta2_scheduler)
         cur_gamma = cosine_decay_with_warmup(cur_nimg, **gamma_scheduler)
         cur_ema_nimg = cosine_decay_with_warmup(cur_nimg, **ema_scheduler)
         cur_aug_p = cosine_decay_with_warmup(cur_nimg, **aug_scheduler)
-        
+
         if augment_pipe is not None:
             augment_pipe.p.copy_(misc.constant(cur_aug_p, device=device))
-        
+
         # Execute training phases.
-        for phase, phase_gen_z, phase_real_img, phase_real_c in zip(phases, all_gen_z, all_real_img, all_real_c):
+        for phase in phases:
             if phase.start_event is not None:
                 phase.start_event.record(torch.cuda.current_stream(device))
 
-            # Accumulate gradients.
             phase.opt.zero_grad(set_to_none=True)
             phase.module.requires_grad_(True)
-            for real_img, real_c, gen_z in zip(phase_real_img, phase_real_c, phase_gen_z):
-                loss.accumulate_gradients(phase=phase.name, real_img=real_img, real_c=real_c, gen_z=gen_z, gamma=cur_gamma, gain=num_gpus * phase.batch_gpu / batch_size)
+
+            for lr, hr, c in zip(lr_img, hr_img, label):
+                loss.accumulate_gradients(
+                    phase=phase.name,
+                    real_img=hr,
+                    real_c=c,
+                    gen_z=lr,  # NOTE: gen_z is now LR image!
+                    gamma=cur_gamma,
+                    gain=num_gpus * phase.batch_gpu / batch_size
+                )
+
             phase.module.requires_grad_(False)
-        
-            # Update weights.  
+
             for g in phase.opt.param_groups:
                 g['lr'] = cur_lr
                 g['betas'] = (0, cur_beta2)
-                      
+
             with torch.autograd.profiler.record_function(phase.name + '_opt'):
                 params = [param for param in phase.module.parameters() if param.grad is not None]
                 if len(params) > 0:
@@ -358,7 +352,6 @@ def training_loop(
                         param.grad = grad.reshape(param.shape)
                 phase.opt.step()
 
-            # Phase done.
             if phase.end_event is not None:
                 phase.end_event.record(torch.cuda.current_stream(device))
 
@@ -370,7 +363,6 @@ def training_loop(
             for b_ema, b in zip(G_ema.buffers(), G.buffers()):
                 b_ema.copy_(b)
 
-        # Update state.
         cur_nimg += batch_size
         batch_idx += 1
 
@@ -414,6 +406,7 @@ def training_loop(
             images = torch.cat([G_ema(z, c).cpu() for z, c in zip(grid_z, grid_c)]).to(torch.float).numpy()
             save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:09d}.png'), drange=[-1,1], grid_size=grid_size)
 
+        
         # Save network snapshot.
         snapshot_pkl = None
         snapshot_data = None
