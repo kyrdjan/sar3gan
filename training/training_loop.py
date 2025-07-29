@@ -170,10 +170,10 @@ def training_loop(
     D_training_set = dnnlib.util.construct_class_by_name(**D_training_set_kwargs) # subclass of training.dataset.Dataset
     D_training_set_sampler = misc.InfiniteSampler(dataset=D_training_set, rank=rank, num_replicas=num_gpus, seed=random_seed)
     D_training_set_iterator = iter(torch.utils.data.DataLoader(dataset=D_training_set, sampler=D_training_set_sampler, batch_size=batch_size//num_gpus, **data_loader_kwargs))
-    
+
     if rank == 0:
         print()
-        print('Num images: ', len(G_training_set)+len(D_training_set))
+        print('Num images: ', G_training_set_kwargs.max_size + D_training_set_kwargs.max_size)  # i'm not sureee
         print('Image shape:', G_training_set.image_shape)
         print('Label shape:', G_training_set.label_shape)
         print()
@@ -184,7 +184,7 @@ def training_loop(
     common_kwargs = dict(c_dim=G_training_set.label_dim, img_resolution=G_training_set.resolution)
     G = dnnlib.util.construct_class_by_name(**G_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
     D = dnnlib.util.construct_class_by_name(**D_kwargs, **common_kwargs).train().requires_grad_(False).to(device) # subclass of torch.nn.Module
-    G_ema = copy.deepcopy(G).eval()
+    G_ema = copy.deepcopy(G).eval() # Generator with Exponential Moving Average of weights
 
     # Resume from existing pickle.
     if resume_pkl is not None:
@@ -246,21 +246,47 @@ def training_loop(
             phase.start_event = torch.cuda.Event(enable_timing=True)
             phase.end_event = torch.cuda.Event(enable_timing=True)
 
-
-    # TODO: NEED TO FIX THE CODE BELOW
-    # Export sample images.
+    # Export sample image.
     grid_size = None
     grid_lr = None
     grid_c = None
-    if rank == 0: # how to fix this
-        print('Exporting sample images...')
-        grid_size, images, labels = setup_snapshot_image_grid(training_set=G_training_set)
-        save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0,255], grid_size=grid_size)
-        grid_lr = torch.stack([G_training_set[i][0] for i in range(len(labels))]).to(device).split(g_batch_gpu)
-        grid_c = torch.from_numpy(labels).to(device).split(g_batch_gpu)
-        images = torch.cat([G_ema(lr, c).cpu() for lr, c in zip(grid_lr, grid_c)]).to(torch.float).numpy()
 
-        save_image_grid(images, os.path.join(run_dir, 'fakes_init.png'), drange=[-1,1], grid_size=grid_size)
+    if rank == 0:
+        print('Exporting one sample image...')
+
+        # Export only 1 sample
+        n_samples = 1
+        if len(G_training_set) == 0:
+            raise RuntimeError("No samples available in the training set for snapshot export.")
+
+        # Set grid size to (1, 1)
+        grid_size = (1, 1)
+        print(f"[Debug] Exporting 1 sample, grid size: {grid_size}")
+
+        # Get the 1st sample (LR image only)
+        lr_np = G_training_set[0][0]  # NumPy array [C, H, W]
+        images = np.stack([lr_np])  # [1, C, H, W]
+        save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0, 255], grid_size=grid_size)
+
+        # Dummy label (for conditional generation)
+        label = np.zeros(1, dtype=np.int64)
+        lr_tensor = torch.from_numpy(lr_np).unsqueeze(0).to(device)  # [1, C, H, W]
+        label_tensor = torch.from_numpy(label).to(device)
+
+        # Generate fake HR image
+        with torch.no_grad():
+            fake = G_ema(lr_tensor, label_tensor)
+            if isinstance(fake, np.ndarray):
+                fake = torch.from_numpy(fake)
+            if not isinstance(fake, torch.Tensor):
+                raise TypeError(f"G_ema returned type {type(fake)}; expected Tensor or ndarray.")
+
+        # Save fake image
+        fake_image = fake.cpu().to(torch.float).numpy()
+        save_image_grid(fake_image, os.path.join(run_dir, 'fakes_init.png'), drange=[-1, 1], grid_size=grid_size)
+
+        print(f"[Debug] Real image shape: {lr_np.shape}")
+        print(f"[Debug] Fake image shape: {fake.shape}")
 
     # Initialize logs.
     if rank == 0:
