@@ -6,6 +6,7 @@
 # distribution of this software and related documentation without an express
 # license agreement from NVIDIA CORPORATION is strictly prohibited.
 
+
 """Loss functions."""
 
 from torch_utils import training_stats
@@ -25,6 +26,7 @@ class R3GANLoss:
     def accumulate_gradients(self, phase, real_img, real_c, gen_z, gamma, gain):
         # G
         if phase == 'G':
+
             AdversarialLoss, RelativisticLogits = self.trainer.AccumulateGeneratorGradients(gen_z, real_img, real_c, gain, self.preprocessor)
             
             training_stats.report('Loss/scores/fake', RelativisticLogits)
@@ -33,6 +35,7 @@ class R3GANLoss:
             
         # D
         if phase == 'D':
+
             AdversarialLoss, RelativisticLogits, R1Penalty, R2Penalty = self.trainer.AccumulateDiscriminatorGradients(gen_z, real_img, real_c, gamma, gain, self.preprocessor)
             
             training_stats.report('Loss/scores/real', RelativisticLogits)

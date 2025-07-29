@@ -354,15 +354,9 @@ def training_loop(
             phase.opt.zero_grad(set_to_none=True)
             phase.module.requires_grad_(True)
 
+            # AccumulateDiscriminatorGradients(gen_z, real_img, real_c, gamma, gain, self.preprocessor)
             for lr, hr, c in zip(lr_img, hr_img, label):
-                loss.accumulate_gradients(
-                    phase=phase.name,
-                    real_img=hr,
-                    real_c=c,
-                    gen_z=lr,  # NOTE: gen_z is now LR image!
-                    gamma=cur_gamma,
-                    gain=num_gpus * phase.batch_gpu / batch_size
-                )
+                loss.accumulate_gradients(phase=phase.name, real_img=hr, real_c=c, gen_z=lr, gamma=cur_gamma,gain=num_gpus * phase.batch_gpu / batch_size)
 
             phase.module.requires_grad_(False)
 
@@ -431,10 +425,12 @@ def training_loop(
                 print()
                 print('Aborting...')
 
-        # Save image snapshot.
-        if (rank == 0) and (image_snapshot_ticks is not None) and (done or cur_tick % image_snapshot_ticks == 0):
-            images = torch.cat([G_ema(z, c).cpu() for z, c in zip(grid_z, grid_c)]).to(torch.float).numpy()
-            save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:09d}.png'), drange=[-1,1], grid_size=grid_size)
+
+        # TODO:LATER for lyndon to bottom (priority no. 1)
+        # # Save image snapshot.
+        # if (rank == 0) and (image_snapshot_ticks is not None) and (done or cur_tick % image_snapshot_ticks == 0):
+        #     images = torch.cat([G_ema(z, c).cpu() for z, c in zip(grid_lr, grid_c)]).to(torch.float).numpy()
+        #     save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:09d}.png'), drange=[-1,1], grid_size=grid_size)
 
         
         # Save network snapshot.
@@ -462,6 +458,8 @@ def training_loop(
         if (snapshot_data is not None) and (len(metrics) > 0):
             if rank == 0:
                 print('Evaluating metrics...')
+            
+            #TODO: adjust from here to bottom (priority no. 2)
             for metric in metrics:
                 result_dict = metric_main.calc_metric(metric=metric, G=snapshot_data['G_ema'],
                     dataset_kwargs=D_training_set_kwargs, num_gpus=num_gpus, rank=rank, device=device) # D's dataset

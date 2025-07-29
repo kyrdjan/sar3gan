@@ -23,8 +23,6 @@ class Convolution(nn.Module):
         
         return nn.functional.conv2d(x, self.Layer.weight.to(x.dtype), padding=self.Layer.padding, groups=self.Layer.groups)
 
-
-
 # Self-Attention Layer (Simplified for 2D feature maps)
 class SelfAttention(nn.Module):
     def __init__(self, channels):
@@ -136,18 +134,22 @@ class GenerativeBasis(nn.Module): # NEW
         return self.Basis.view(1, -1, 4, 4) * out
 
 
-class DiscriminativeBasis(nn.Module):
+class DiscriminativeBasis(nn.Module): # OLD
     def __init__(self, InputChannels, OutputDimension):
         super(DiscriminativeBasis, self).__init__()
         
         self.Basis = MSRInitializer(nn.Conv2d(InputChannels, InputChannels, kernel_size=4, stride=1, padding=0, groups=InputChannels, bias=False))
         self.LinearLayer = MSRInitializer(nn.Linear(InputChannels, OutputDimension, bias=False))
         
-    def forward(self, x):
+    # def forward(self, x):# OLD
+    #     assert x.shape[2:] == (4, 4), f"Expected 4x4, got {x.shape[2:]}"
+    #     return self.LinearLayer(self.Basis(x).view(x.shape[0], -1))
 
-        return self.LinearLayer(self.Basis(x).view(x.shape[0], -1))
+    def forward(self, x): # NEW (IDK WHYYY)
+        x = self.Basis(x)  # Depthwise conv
+        x = x.mean(dim=[2, 3])  # Global average pool [N, C, H, W] → [N, C]
+        return self.LinearLayer(x)
     
-
 
 class GeneratorStage(nn.Module):
     def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
@@ -270,8 +272,8 @@ class Discriminator(nn.Module):
 
         x = self.ExtractionLayer(x.to(self.MainLayers[0].DataType))
 
-        for Layer in self.MainLayers:
+        for i, Layer in enumerate(self.MainLayers):
             x = Layer(x)
 
-        # return x.view(x.shape[0]) # old
-        return x.view(x.shape[0], -1).mean(dim=1)  # one value per sample
+        return x.view(x.shape[0], -1).mean(dim=1)  # [B]
+
