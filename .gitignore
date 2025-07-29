@@ -1,3 +1,5 @@
 datasets/
 sar3ganve/
 training-runs/
+R3GAN/__pycache__/
+training/__pycache__/
