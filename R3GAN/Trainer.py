@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+
+# TODO: tobe modify
 class AdversarialTraining:
     def __init__(self, Generator, Discriminator):
         self.Generator = Generator

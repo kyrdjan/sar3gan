@@ -288,6 +288,8 @@ def training_loop(
         print(f"[Debug] Real image shape: {lr_np.shape}")
         print(f"[Debug] Fake image shape: {fake.shape}")
 
+    # i shall return ----------------------------------- (kyr ended this code)
+
     # Initialize logs.
     if rank == 0:
         print('Initializing logs...')
@@ -323,6 +325,8 @@ def training_loop(
         if phase.end_event is not None:
             phase.end_event.record(torch.cuda.current_stream(device))
         
+
+    # TODO: adjust for lr_img input instead of noise/z.
     while True:
         # Fetch paired LR-HR training data.
         with torch.autograd.profiler.record_function('data_fetch'):
