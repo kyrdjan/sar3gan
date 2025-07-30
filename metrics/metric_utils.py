@@ -245,35 +245,91 @@ def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_l
 
 #----------------------------------------------------------------------------
 
-def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, batch_gen=None, **stats_kwargs):
+# def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, batch_gen=None, **stats_kwargs): OLD
+#     if batch_gen is None:
+#         batch_gen = min(batch_size, 4)
+#     assert batch_size % batch_gen == 0
+
+#     # Setup generator and labels.
+#     G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
+#     c_iter = iterate_random_labels(opts=opts, batch_size=batch_gen)
+
+#     # Initialize.
+#     stats = FeatureStats(**stats_kwargs)
+#     assert stats.max_items is not None
+#     progress = opts.progress.sub(tag='generator features', num_items=stats.max_items, rel_lo=rel_lo, rel_hi=rel_hi)
+#     detector = get_feature_detector(url=detector_url, device=opts.device, num_gpus=opts.num_gpus, rank=opts.rank, verbose=progress.verbose)
+
+#     # Main loop.
+#     while not stats.is_full():
+#         images = []
+#         for _i in range(batch_size // batch_gen):
+#             z = torch.randn([batch_gen, G.z_dim], device=opts.device)
+#             img = G(z, next(c_iter))
+#             img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
+#             images.append(img)
+#         images = torch.cat(images)
+#         if images.shape[1] == 1:
+#             images = images.repeat([1, 3, 1, 1])
+#         features = detector(images, **detector_kwargs)
+#         stats.append_torch(features, num_gpus=opts.num_gpus, rank=opts.rank)
+#         progress.update(stats.num_items)
+#     return stats
+
+from torch.utils.data import DataLoader
+
+def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, batch_gen=None, **stats_kwargs): # NEW
     if batch_gen is None:
         batch_gen = min(batch_size, 4)
     assert batch_size % batch_gen == 0
 
-    # Setup generator and labels.
+    # Clone generator
     G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
-    c_iter = iterate_random_labels(opts=opts, batch_size=batch_gen)
+    use_labels = (G.c_dim != 0)
+    c_iter = iterate_random_labels(opts=opts, batch_size=batch_gen) if use_labels else None # no use
 
-    # Initialize.
+    # Build temporary dataset using opts.dataset_kwargs
+    dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs)
+    dataloader = DataLoader(dataset, batch_size=batch_gen, shuffle=True, num_workers=0)
+    data_iter = iter(dataloader)
+
+    # Init feature stats
     stats = FeatureStats(**stats_kwargs)
     assert stats.max_items is not None
     progress = opts.progress.sub(tag='generator features', num_items=stats.max_items, rel_lo=rel_lo, rel_hi=rel_hi)
-    detector = get_feature_detector(url=detector_url, device=opts.device, num_gpus=opts.num_gpus, rank=opts.rank, verbose=progress.verbose)
+    detector = get_feature_detector(url=detector_url, device=opts.device,
+                                    num_gpus=opts.num_gpus, rank=opts.rank, verbose=progress.verbose)
 
-    # Main loop.
+    # Main loop
     while not stats.is_full():
         images = []
+
         for _i in range(batch_size // batch_gen):
-            z = torch.randn([batch_gen, G.z_dim], device=opts.device)
-            img = G(z, next(c_iter))
+            try:
+                batch = next(data_iter)
+            except StopIteration:
+                data_iter = iter(DataLoader(dataset, batch_size=batch_gen, shuffle=True, num_workers=0))
+                batch = next(data_iter)
+
+            # Assume dataset returns (lr, hr) or (lr, label)
+            lr = batch[0].to(opts.device)
+            c = batch[1].to(opts.device) if use_labels and len(batch) > 1 else None
+
+            if use_labels:
+                img = G(lr, c)
+            else:
+                img = G(lr)
+
             img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
             images.append(img)
+
         images = torch.cat(images)
         if images.shape[1] == 1:
-            images = images.repeat([1, 3, 1, 1])
+            images = images.repeat([1, 3, 1, 1])  # grayscale to RGB
+
         features = detector(images, **detector_kwargs)
         stats.append_torch(features, num_gpus=opts.num_gpus, rank=opts.rank)
         progress.update(stats.num_items)
-    return stats
 
+    return stats
 #----------------------------------------------------------------------------
