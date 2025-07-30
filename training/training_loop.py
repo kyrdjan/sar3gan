@@ -437,7 +437,12 @@ def training_loop(
         snapshot_pkl = None
         snapshot_data = None
         if (network_snapshot_ticks is not None) and (done or cur_tick % network_snapshot_ticks == 0):
-            snapshot_data = dict(G=G, D=D, G_ema=G_ema, G_training_set_kwargs=dict(G_training_set_kwargs), D_training_set_kwargs=dict(D_training_set_kwargs), cur_nimg=cur_nimg)
+            snapshot_data = dict(
+                G=G, D=D, G_ema=G_ema,
+                G_training_set_kwargs=dict(G_training_set_kwargs),
+                D_training_set_kwargs=dict(D_training_set_kwargs),
+                cur_nimg=cur_nimg,
+            )
             for phase in phases:
                 snapshot_data[phase.name + '_opt_state'] = remap_optimizer_state_dict(phase.opt.state_dict(), 'cpu')
             for key, value in snapshot_data.items():
