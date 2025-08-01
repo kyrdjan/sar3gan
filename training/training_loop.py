@@ -459,7 +459,7 @@ def training_loop(
             if rank == 0:
                 print('Evaluating metrics...')
             
-            #TODO: adjust from here to bottom (priority no. 2)
+            #TODO: NEED OTHER DATASET FOR THE CROSS VALIDATION
             for metric in metrics:
                 result_dict = metric_main.calc_metric(metric=metric, G=snapshot_data['G_ema'],
                     dataset_kwargs=D_training_set_kwargs, num_gpus=num_gpus, rank=rank, device=device) # D's dataset
