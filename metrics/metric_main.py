@@ -19,6 +19,7 @@ from . import frechet_inception_distance
 from . import kernel_inception_distance
 from . import precision_recall
 from . import inception_score
+from . import structural_similarity_index_measure
 
 #----------------------------------------------------------------------------
 
@@ -98,6 +99,14 @@ def pr50k3_full(opts):
     precision, recall = precision_recall.compute_pr(opts, max_real=200000, num_gen=50000, nhood_size=3, row_batch_size=10000, col_batch_size=10000)
     return dict(pr50k3_full_precision=precision, pr50k3_full_recall=recall)
 
+#Custom Metric
+# ---------------------------------------------------------------------------
+@register_metric
+def ssim50k(opts):
+    opts.dataset_kwargs.update(max_size=None)
+    mean_ssim, std_ssim = structural_similarity_index_measure.compute_ssim(opts, num_gen=50000, max_real=50000)
+    return dict(ssim50k_mean=mean_ssim, ssim50k_std=std_ssim)
+    
 #----------------------------------------------------------------------------
 # Legacy metrics.
 
