@@ -19,6 +19,7 @@ from . import frechet_inception_distance
 from . import kernel_inception_distance
 from . import precision_recall
 from . import inception_score
+from . import structural_similarity_index_measure
 
 #----------------------------------------------------------------------------
 
@@ -82,6 +83,7 @@ def report_metric(result_dict, run_dir=None, snapshot_pkl=None):
 
 # understand why 50k is the defualt.
 @register_metric
+# original FID
 def fid50k_full(opts):
     opts.dataset_kwargs.update(max_size=None, xflip=False)
     fid = frechet_inception_distance.compute_fid(opts, max_real=None, num_gen=50000)
@@ -99,6 +101,37 @@ def pr50k3_full(opts):
     precision, recall = precision_recall.compute_pr(opts, max_real=200000, num_gen=50000, nhood_size=3, row_batch_size=10000, col_batch_size=10000)
     return dict(pr50k3_full_precision=precision, pr50k3_full_recall=recall)
 
+#Custom Metric
+# ---------------------------------------------------------------------------
+@register_metric
+def ssim50k(opts):
+    opts.dataset_kwargs.update(max_size=None)
+    mean_ssim, std_ssim = structural_similarity_index_measure.compute_ssim(opts, num_gen=50000, max_real=50000)
+    return dict(ssim50k_mean=mean_ssim, ssim50k_std=std_ssim)
+
+
+@register_metric
+def fid50k_en(opts):
+    import copy
+    # For this to work, you need to modify your training script to pass
+    # both HR and LR dataset paths in the opts
+    
+    # Create HR options (for real images)
+    opts_hr = copy.deepcopy(opts)
+    if hasattr(opts, 'hr_dataset_kwargs'):
+        opts_hr.dataset_kwargs = opts.hr_dataset_kwargs
+    opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
+    
+    # Create LR options (for generator inputs)  
+    opts_lr = copy.deepcopy(opts)
+    if hasattr(opts, 'lr_dataset_kwargs'):
+        opts_lr.dataset_kwargs = opts.lr_dataset_kwargs
+    opts_lr.dataset_kwargs.update(max_size=None, xflip=False)
+    
+    fid = frechet_inception_distance.compute_fid_en(opts_hr, opts_lr, max_real=50000, num_gen=50000)
+    return dict(fid50k_en=fid)
+
+    
 #----------------------------------------------------------------------------
 # Legacy metrics.
 

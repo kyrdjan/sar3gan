@@ -46,7 +46,7 @@ def subprocess_fn(rank, c, temp_dir):
 #----------------------------------------------------------------------------
 
 
-# TODO: TRACE where is desc
+
 def launch_training(c, desc, outdir, dry_run):
     dnnlib.util.Logger(should_flush=True)
 

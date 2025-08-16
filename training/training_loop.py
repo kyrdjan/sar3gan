@@ -425,18 +425,23 @@ def training_loop(
                 print('Aborting...')
 
 
-        # TODO:LATER for lyndon to bottom (priority no. 1)
+
         # # Save image snapshot.
         # if (rank == 0) and (image_snapshot_ticks is not None) and (done or cur_tick % image_snapshot_ticks == 0):
         #     images = torch.cat([G_ema(z, c).cpu() for z, c in zip(grid_lr, grid_c)]).to(torch.float).numpy()
         #     save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:09d}.png'), drange=[-1,1], grid_size=grid_size)
 
-        
+
         # Save network snapshot.
         snapshot_pkl = None
         snapshot_data = None
         if (network_snapshot_ticks is not None) and (done or cur_tick % network_snapshot_ticks == 0):
-            snapshot_data = dict(G=G, D=D, G_ema=G_ema, G_training_set_kwargs=dict(G_training_set_kwargs), D_training_set_kwargs=dict(D_training_set_kwargs), cur_nimg=cur_nimg)
+            snapshot_data = dict(
+                G=G, D=D, G_ema=G_ema,
+                G_training_set_kwargs=dict(G_training_set_kwargs),
+                D_training_set_kwargs=dict(D_training_set_kwargs),
+                cur_nimg=cur_nimg,
+            )
             for phase in phases:
                 snapshot_data[phase.name + '_opt_state'] = remap_optimizer_state_dict(phase.opt.state_dict(), 'cpu')
             for key, value in snapshot_data.items():
