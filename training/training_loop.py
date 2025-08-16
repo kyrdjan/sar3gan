@@ -326,7 +326,6 @@ def training_loop(
             phase.end_event.record(torch.cuda.current_stream(device))
         
 
-    # TODO: adjust for lr_img input instead of noise/z.
     while True:
         # Fetch paired LR-HR training data.
         with torch.autograd.profiler.record_function('data_fetch'):

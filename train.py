@@ -183,16 +183,19 @@ def main(**kwargs):
     c.g_batch_gpu = opts.g_batch_gpu or opts.batch // opts.gpus
     c.d_batch_gpu = opts.d_batch_gpu or opts.batch // opts.gpus
 
-    if opts.preset == 'TEST-128':
-        # Core architecture settings
-        WidthPerStage       = [128, 128, 128, 128]   # 4 stages
-        BlocksPerStage      = [2, 2, 2, 2]           # Same number of blocks per stage
-        CardinalityPerStage = [8, 8, 8, 4]           # Light but with some depth
-        FP16Stages          = [-1, -2]               # Use FP16 in last 2 stages (optional)
+    if opts.preset == 'TEST-256':
+        # Core architecture settings (256×256, no conditional)
+        WidthPerStage       = [256, 256, 256, 256, 256, 256, 256]  # 7 stages to reach 256×256
+        BlocksPerStage      = [2, 2, 2, 2, 2, 2, 2]                # 2 blocks per stage
+        CardinalityPerStage = [8, 8, 8, 8, 4, 4, 4]                # Grouped conv cardinalities
+        FP16Stages          = [-1, -2]                             # Use mixed precision for largest resolutions
 
-        # Training schedule
-        ema_nimg    = 200 * 1000                     # Adjust depending on dataset size
-        decay_nimg  = 10_000_000                     # 10M images for full decay
+        # Training schedule (scaled for 10k dataset, ~100 epochs)
+        dataset_size = 10_000
+        target_epochs = 100
+
+        decay_nimg = dataset_size * target_epochs       # 1,000,000 images total
+        ema_nimg   = dataset_size * 5                   # 50,000 images (EMA ramp over ~5 epochs)
 
         c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
         c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.3,        'total_nimg': decay_nimg }
@@ -200,7 +203,11 @@ def main(**kwargs):
         c.gamma_scheduler  = { 'base_value': 2.0,  'final_value': 0.2,        'total_nimg': decay_nimg }
         c.beta2_scheduler  = { 'base_value': 0.9,  'final_value': 0.99,       'total_nimg': decay_nimg }
 
-
+        # No conditional or noise dimension
+        # Remove:
+        # c.G_kwargs.ConditionEmbeddingDimension
+        # c.D_kwargs.ConditionEmbeddingDimension
+        # NoiseDimension
 
     {
     # if opts.preset == 'CIFAR10':
