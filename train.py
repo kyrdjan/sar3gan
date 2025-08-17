@@ -65,15 +65,15 @@ def launch_training(c, desc, outdir, dry_run):
     print('Training options:')
     print(json.dumps(c, indent=2))
     print()
-    print(f'Output directory:    {c.run_dir}')
-    print(f'Number of GPUs:      {c.num_gpus}')
-    print(f'Batch size:          {c.batch_size} images')
-    print(f'Training duration:   {c.total_kimg} kimg')
-    print(f'Dataset path:        {c.G_training_set_kwargs.path}') # Just Generator Only
-    print(f'Dataset size:        {c.G_training_set_kwargs.max_size} images')  # Just Generator Only
-    print(f'Dataset resolution:  {c.G_training_set_kwargs.resolution}')  # Just Generator Only
-    print(f'Dataset labels:      {c.G_training_set_kwargs.use_labels}')  # Just Generator Only
-    print(f'Dataset x-flips:     {c.G_training_set_kwargs.xflip}')  # Just Generator Only
+    print(f'Output directory:               {c.run_dir}')
+    print(f'Number of GPUs:                 {c.num_gpus}')
+    print(f'Batch size:                     {c.batch_size} images')
+    print(f'Training duration:              {c.total_kimg} kimg')
+    print(f'Dataset path:                   {c.G_training_set_kwargs.path}') # Just Generator Only
+    print(f'Generators Dataset size:        {c.G_training_set_kwargs.max_size} images')  # Just Generator Only
+    print(f'Dataset resolution:             {c.G_training_set_kwargs.resolution}')  # Just Generator Only
+    print(f'Dataset labels:                 {c.G_training_set_kwargs.use_labels}')  # Just Generator Only
+    print(f'Dataset x-flips:                {c.G_training_set_kwargs.xflip}')  # Just Generator Only
     print()
 
     
@@ -128,6 +128,8 @@ def parse_comma_separated_list(s):
 @click.option('--outdir',       help='Where to save the results', metavar='DIR',                required=True)
 @click.option('--g-data',       help='Generator Training data', metavar='[ZIP|DIR]',            type=str, required=True)
 @click.option('--d-data',       help='Discriminator Training data', metavar='[ZIP|DIR]',        type=str, required=True)
+@click.option('--vg-data',       help='Cross Dataset Validation G data', metavar='[ZIP|DIR]',   type=str, required=True)
+@click.option('--vd-data',       help='Cross Dataset Validation D data', metavar='[ZIP|DIR]',   type=str, required=True)
 @click.option('--gpus',         help='Number of GPUs to use', metavar='INT',                    type=click.IntRange(min=1), required=True)
 @click.option('--batch',        help='Total batch size', metavar='INT',                         type=click.IntRange(min=1), required=True)
 @click.option('--preset',       help='Preset configs', metavar='STR',                           type=str, required=True)
@@ -160,7 +162,6 @@ def main(**kwargs):
     
     c.G_kwargs = dnnlib.EasyDict(class_name='training.networks.Generator')
     c.D_kwargs = dnnlib.EasyDict(class_name='training.networks.Discriminator')
-    
     c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0], eps=1e-8)
     c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0], eps=1e-8)
     
@@ -170,6 +171,9 @@ def main(**kwargs):
     # Training set.
     c.G_training_set_kwargs, G_dataset_name = init_dataset_kwargs(data=opts.g_data)
     c.D_training_set_kwargs, D_dataset_name = init_dataset_kwargs(data=opts.d_data)
+    c.VG_training_set_kwargs, VG_dataset_name = init_dataset_kwargs(data=opts.vg_data)
+    c.VD_training_set_kwargs, VD_dataset_name = init_dataset_kwargs(data=opts.vd_data)
+
     if opts.cond and not c.training_set_kwargs.use_labels:
         raise click.ClickException('--cond=True requires labels specified in dataset.json')
     c.G_training_set_kwargs.use_labels = opts.cond
@@ -344,7 +348,7 @@ def main(**kwargs):
         c.cudnn_benchmark = False
 
     # Description string.
-    desc = f'{G_dataset_name:s}&{D_dataset_name:s}-gpus{c.num_gpus:d}-batch{c.batch_size:d}'
+    desc = f'training{G_dataset_name:s}&{D_dataset_name:s}-validation{VG_dataset_name:s}&{VD_dataset_name:s}-gpus{c.num_gpus:d}-batch{c.batch_size:d}'
     if opts.desc is not None:
         desc += f'-{opts.desc}'
 

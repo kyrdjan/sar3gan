@@ -120,6 +120,8 @@ def training_loop(
     run_dir                 = '.',      # Output directory.
     G_training_set_kwargs   = {},       # Options for G training set.
     D_training_set_kwargs   = {},       # Options for G training set.
+    VG_training_set_kwargs  = {},       # Just the dataset of the Cross-Dataset Validation (Low Resolution).
+    VD_training_set_kwargs  = {},       # Just the dataset of the Cross-Dataset Validation (High Resolution).
     data_loader_kwargs      = {},       # Options for torch.utils.data.DataLoader.
     G_kwargs                = {},       # Options for generator network.
     D_kwargs                = {},       # Options for discriminator network.
@@ -173,7 +175,8 @@ def training_loop(
 
     if rank == 0:
         print()
-        print('Num images: ', G_training_set_kwargs.max_size + D_training_set_kwargs.max_size)  # i'm not sureee
+        # print('Num images: ', G_training_set_kwargs.max_size + D_training_set_kwargs.max_size)  # i'm not sureee (see R3GAN repo for reference and adjust later)
+        print('Num images: ', len(G_training_set) + len(D_training_set)) # try
         print('Image shape:', G_training_set.image_shape)
         print('Label shape:', G_training_set.label_shape)
         print()
@@ -264,15 +267,20 @@ def training_loop(
         print(f"[Debug] Exporting 1 sample, grid size: {grid_size}")
 
         # Get the 1st sample (LR image only)
-        lr_np = G_training_set[0][0]  # NumPy array [C, H, W]
+        lr_np = G_training_set[0][0]  # (C,H,W) from LR dataset
+        hr_np = D_training_set[0][0]  # (C,H,W) from HR datase
         images = np.stack([lr_np])  # [1, C, H, W]
-        save_image_grid(images, os.path.join(run_dir, 'reals.png'), drange=[0, 255], grid_size=grid_size)
+        fname = os.path.splitext(os.path.basename(G_training_set.get_fname(0)))[0] # get the original file name without extension
+        save_image_grid(images, os.path.join(run_dir, f"initial_low_resolution.png"), drange=[0, 255], grid_size=grid_size)
 
         # Dummy label (for conditional generation)
         label = np.zeros(1, dtype=np.int64)
         lr_tensor = torch.from_numpy(lr_np).unsqueeze(0).to(device)  # [1, C, H, W]
         label_tensor = torch.from_numpy(label).to(device)
-
+        grid_lr = [torch.from_numpy(lr_np).to(device)]
+        grid_hr = [torch.from_numpy(hr_np).to(device)]
+        grid_c  = [torch.zeros(1, dtype=torch.int64, device=device)] 
+       
         # Generate fake HR image
         with torch.no_grad():
             fake = G_ema(lr_tensor, label_tensor)
@@ -283,7 +291,7 @@ def training_loop(
 
         # Save fake image
         fake_image = fake.cpu().to(torch.float).numpy()
-        save_image_grid(fake_image, os.path.join(run_dir, 'fakes_init.png'), drange=[-1, 1], grid_size=grid_size)
+        save_image_grid(fake_image, os.path.join(run_dir, f"initial_fake.png" ), drange=[-1, 1], grid_size=grid_size) # use same name for both generated and fake (see kine 272)
 
         print(f"[Debug] Real image shape: {lr_np.shape}")
         print(f"[Debug] Fake image shape: {fake.shape}")
@@ -331,8 +339,8 @@ def training_loop(
         with torch.autograd.profiler.record_function('data_fetch'):
             lr_img, label = next(G_training_set_iterator)
             hr_img, _ = next(D_training_set_iterator)
-            lr_img = lr_img.to(device).to(torch.float32).split(g_batch_gpu)  # No normalization
-            hr_img = hr_img.to(device).to(torch.float32).split(d_batch_gpu)  # No normalization
+            lr_img = (lr_img.to(device).to(torch.float32) / 127.5 - 1).split(g_batch_gpu)
+            hr_img = (hr_img.to(device).to(torch.float32) / 127.5 - 1).split(d_batch_gpu)
             label = label.to(device).split(g_batch_gpu)
 
         # Update schedulers.
@@ -425,52 +433,117 @@ def training_loop(
                 print('Aborting...')
 
 
-
-        # # Save image snapshot.
+        # TODO: Later after the evaluation is perfect
+        # # Save image snapshot. # OLD
         # if (rank == 0) and (image_snapshot_ticks is not None) and (done or cur_tick % image_snapshot_ticks == 0):
         #     images = torch.cat([G_ema(z, c).cpu() for z, c in zip(grid_lr, grid_c)]).to(torch.float).numpy()
         #     save_image_grid(images, os.path.join(run_dir, f'fakes{cur_nimg//1000:09d}.png'), drange=[-1,1], grid_size=grid_size)
 
+        # Save image snapshot. # NEW
+        if (rank == 0) and (image_snapshot_ticks is not None) and (done or cur_tick % image_snapshot_ticks == 0):
+            with torch.no_grad():
+                gen_images = []
+                real_images = []
+                for lr, hr, c in zip(grid_lr, grid_hr, grid_c):  
+                    # Generator output (normalized in [-1,1])
+                    fake = G_ema(lr.unsqueeze(0).to(device), c.unsqueeze(0).to(device) if c is not None else None)
+                    gen_images.append(fake.cpu())
+                    
+                    # HR dataset image (already in [0,255])
+                    real_images.append(hr.unsqueeze(0).cpu())
+
+                # Stack all: [N, C, H, W]
+                gen_images = torch.cat(gen_images, dim=0)
+                real_images = torch.cat(real_images, dim=0)
+
+            # Save generator outputs ([-1,1])
+            save_image_grid(
+                gen_images.to(torch.float).numpy(),
+                os.path.join(run_dir, f'fakes{cur_nimg//1000:09d}.png'),
+                drange=[-1, 1],   # Generator outputs are normalized
+                grid_size=grid_size
+            )
+
+            # Save real HR images ([0,255])
+            save_image_grid(
+                real_images.to(torch.float).numpy(),
+                os.path.join(run_dir, f'reals{cur_nimg//1000:09d}.png'),
+                drange=[0, 255],   # <- FIXED: real dataset is in [0,255]
+                grid_size=grid_size
+            )
+
 
         # Save network snapshot.
+        snapshot_in_domain = None
+        snapshot_cross_domain = None
         snapshot_pkl = None
-        snapshot_data = None
+
         if (network_snapshot_ticks is not None) and (done or cur_tick % network_snapshot_ticks == 0):
-            snapshot_data = dict(
-                G=G, D=D, G_ema=G_ema,
-                G_training_set_kwargs=dict(G_training_set_kwargs),
-                D_training_set_kwargs=dict(D_training_set_kwargs),
-                cur_nimg=cur_nimg,
-            )
-            for phase in phases:
-                snapshot_data[phase.name + '_opt_state'] = remap_optimizer_state_dict(phase.opt.state_dict(), 'cpu')
-            for key, value in snapshot_data.items():
-                if isinstance(value, torch.nn.Module):
-                    value = copy.deepcopy(value).eval().requires_grad_(False)
-                    if num_gpus > 1:
-                        misc.check_ddp_consistency(value, ignore_regex=r'.*\.[^.]+_(avg|ema)')
-                        for param in misc.params_and_buffers(value):
-                            torch.distributed.broadcast(param, src=0)
-                    snapshot_data[key] = value.cpu()
-                del value # conserve memory
+
+            def prepare_snapshot(G, D, G_ema, G_kwargs, D_kwargs, cur_nimg, phases):
+                snapshot = dict(
+                    G=G, D=D, G_ema=G_ema,
+                    G_training_set_kwargs=copy.deepcopy(G_kwargs),
+                    D_training_set_kwargs=copy.deepcopy(D_kwargs),
+                    cur_nimg=cur_nimg,
+                )
+                for phase in phases:
+                    snapshot[phase.name + '_opt_state'] = remap_optimizer_state_dict(phase.opt.state_dict(), 'cpu')
+                for key, value in list(snapshot.items()):
+                    if isinstance(value, torch.nn.Module):
+                        value = copy.deepcopy(value).eval().requires_grad_(False)
+                        if num_gpus > 1:
+                            misc.check_ddp_consistency(value, ignore_regex=r'.*\.[^.]+_(avg|ema)')
+                            for param in misc.params_and_buffers(value):
+                                torch.distributed.broadcast(param, src=0)
+                        snapshot[key] = value.cpu()
+                return snapshot
+
+
+            # (A) In-domain snapshot
+            snapshot_in_domain = prepare_snapshot(G, D, G_ema, G_training_set_kwargs, D_training_set_kwargs, cur_nimg, phases)
+
+            # (B) Cross-domain snapshot
+            snapshot_cross_domain = prepare_snapshot(G, D, G_ema, VG_training_set_kwargs, VD_training_set_kwargs, cur_nimg, phases)
+
+            # Save ONE snapshot file (let’s keep cross-domain)
             snapshot_pkl = os.path.join(run_dir, f'network-snapshot-{cur_nimg//1000:09d}.pkl')
             if rank == 0:
                 with open(snapshot_pkl, 'wb') as f:
-                    pickle.dump(snapshot_data, f)
+                    pickle.dump(snapshot_cross_domain, f)
 
-        # Evaluate metrics.
-        if (snapshot_data is not None) and (len(metrics) > 0):
+        # Evaluate metrics. # TODO: NEEDS TO WORK FOR SSIM
+        if (snapshot_in_domain is not None) and (snapshot_cross_domain is not None) and (len(metrics) > 0):
             if rank == 0:
                 print('Evaluating metrics...')
-            
-            #TODO: NEED OTHER DATASET FOR THE CROSS VALIDATION
+
+            # (A) In-domain Validation
             for metric in metrics:
-                result_dict = metric_main.calc_metric(metric=metric, G=snapshot_data['G_ema'],
-                    dataset_kwargs=D_training_set_kwargs, num_gpus=num_gpus, rank=rank, device=device) # D's dataset
+                result_dict = metric_main.calc_metric(
+                    metric=metric, 
+                    G=snapshot_in_domain['G_ema'],
+                    dataset_kwargs=G_training_set_kwargs, 
+                    num_gpus=num_gpus, rank=rank, device=device
+                )
                 if rank == 0:
                     metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
-                stats_metrics.update(result_dict.results)
-        del snapshot_data # conserve memory
+                stats_metrics.update({f"{metric}_in_domain": result_dict.results})
+
+            # (B) Cross-domain Validation
+            for metric in metrics:
+                result_dict = metric_main.calc_metric(
+                    metric=metric, 
+                    G=snapshot_cross_domain['G_ema'],
+                    dataset_kwargs=VG_training_set_kwargs, 
+                    num_gpus=num_gpus, rank=rank, device=device
+                )
+                if rank == 0:
+                    metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
+                stats_metrics.update({f"{metric}_cross_domain": result_dict.results})
+
+        # Cleanup
+        del snapshot_in_domain, snapshot_cross_domain
+
 
         # Collect statistics.
         for phase in phases:
@@ -493,8 +566,15 @@ def training_loop(
             walltime = timestamp - start_time
             for name, value in stats_dict.items():
                 stats_tfevents.add_scalar(name, value.mean, global_step=global_step, walltime=walltime)
-            for name, value in stats_metrics.items():
-                stats_tfevents.add_scalar(f'Metrics/{name}', value, global_step=global_step, walltime=walltime)
+            # for name, value in stats_metrics.items(): # OLD
+            #     stats_tfevents.add_scalar(f'Metrics/{name}', value, global_step=global_step, walltime=walltime)
+            for name, value in stats_metrics.items(): # NEW
+                if isinstance(value, dict):
+                    for k, v in value.items():
+                        stats_tfevents.add_scalar(f'Metrics/{name}/{k}', v, global_step=global_step, walltime=walltime)
+                else:
+                    stats_tfevents.add_scalar(f'Metrics/{name}', value, global_step=global_step, walltime=walltime)
+
             stats_tfevents.flush()
         if progress_fn is not None:
             progress_fn(cur_nimg // 1000, total_kimg)

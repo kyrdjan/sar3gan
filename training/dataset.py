@@ -196,6 +196,9 @@ class ImageFolderDataset(Dataset):
     def _file_ext(fname):
         return os.path.splitext(fname)[1].lower()
 
+    def get_fname(self, raw_idx):
+        return self._image_fnames[raw_idx]
+    
     def _get_zipfile(self):
         assert self._type == 'zip'
         if self._zipfile is None:
