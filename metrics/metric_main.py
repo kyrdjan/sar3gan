@@ -70,6 +70,12 @@ def calc_metric(metric, **kwargs): # See metric_utils.MetricOptions for the full
 #----------------------------------------------------------------------------
 
 def report_metric(result_dict, run_dir=None, snapshot_pkl=None):
+
+    print('run_dir:', run_dir)
+    print()
+    print('snapshots_pkl', snapshot_pkl)
+    print()
+
     metric = result_dict['metric']
     assert is_valid_metric(metric)
     if run_dir is not None and snapshot_pkl is not None:
@@ -109,7 +115,7 @@ def pr50k3_full(opts):
 @register_metric
 def ssim(opts):
     opts.dataset_kwargs.update(max_size=None)
-    mean_ssim, std_ssim = structural_similarity_index_measure.compute_ssim(opts, num_gen=50000, max_real=50000)
+    mean_ssim, std_ssim = structural_similarity_index_measure.compute_ssim(opts, num_gen=10000, max_real=10000) # trying 10k
     return dict(ssim50k_mean=mean_ssim, ssim50k_std=std_ssim)
 
 

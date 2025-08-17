@@ -116,22 +116,46 @@ class DownsampleLayer(nn.Module):
 #         print('GeneraticeBasis input shape=',x.shape)
 #         return self.Basis.view(1, -1, 4, 4) * self.LinearLayer(x).view(x.shape[0], -1, 1, 1)
 
-class GenerativeBasis(nn.Module): # NEW
-    def __init__(self, InputChannels, OutputChannels):
+# class GenerativeBasis(nn.Module): # NEW
+#     def __init__(self, InputChannels, OutputChannels):
+#         super(GenerativeBasis, self).__init__()
+#         self.Basis = nn.Parameter(torch.empty(OutputChannels, 4, 4).normal_(0, 1))
+
+#         self.Project = nn.Sequential(
+#             nn.Conv2d(InputChannels, 64, kernel_size=3, padding=1),
+#             nn.ReLU(),
+#             nn.AdaptiveAvgPool2d((1, 1))  # Output: [N, 64, 1, 1]
+#         )
+#         self.LinearLayer = MSRInitializer(nn.Linear(64, OutputChannels, bias=False))
+
+#     def forward(self, x):  # x: [N, 3, 128, 128]
+#         feat = self.Project(x).view(x.shape[0], -1)  # [N, 64]
+#         out = self.LinearLayer(feat).view(x.shape[0], -1, 1, 1)
+#         return self.Basis.view(1, -1, 4, 4) * out
+
+class GenerativeBasis(nn.Module): # NEW v2
+    def __init__(self, input_channels, output_channels):
         super(GenerativeBasis, self).__init__()
-        self.Basis = nn.Parameter(torch.empty(OutputChannels, 4, 4).normal_(0, 1))
 
+        self.Basis = nn.Parameter(torch.empty(output_channels, 4, 4).normal_(0, 1))
+
+        # 1×1 projection of feature map into global vector
         self.Project = nn.Sequential(
-            nn.Conv2d(InputChannels, 64, kernel_size=3, padding=1),
+            nn.Conv2d(input_channels, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((1, 1))  # Output: [N, 64, 1, 1]
+            nn.AdaptiveAvgPool2d((1, 1)),  # → [N, 64, 1, 1]
         )
-        self.LinearLayer = MSRInitializer(nn.Linear(64, OutputChannels, bias=False))
 
-    def forward(self, x):  # x: [N, 3, 128, 128]
-        feat = self.Project(x).view(x.shape[0], -1)  # [N, 64]
-        out = self.LinearLayer(feat).view(x.shape[0], -1, 1, 1)
-        return self.Basis.view(1, -1, 4, 4) * out
+        self.LinearLayer = MSRInitializer(
+            nn.Linear(64, output_channels, bias=False)
+        )
+
+    def forward(self, x):  # x: [N, 3, H, W]
+        features = self.Project(x)             # [N, 64, 1, 1]
+        vec = features.view(x.size(0), -1)     # [N, 64]
+        coeffs = self.LinearLayer(vec)         # [N, OutChannels]
+        out = self.Basis.view(1, -1, 4, 4) * coeffs.view(x.size(0), -1, 1, 1)  # [N, OutChannels, 4, 4]
+        return out
 
 
 class DiscriminativeBasis(nn.Module): # OLD

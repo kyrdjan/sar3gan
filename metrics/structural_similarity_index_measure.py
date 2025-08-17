@@ -4,6 +4,15 @@ import torch.nn.functional as F
 import dnnlib
 from . import metric_utils
 
+def safe_format(img):
+    # Ensure shape is [B, C, H, W]
+    if img.ndim == 3:         # [B, H, W] → grayscale batch
+        img = img.unsqueeze(1)
+    elif img.ndim == 2:       # [H, W] → single grayscale image
+        img = img.unsqueeze(0).unsqueeze(0)
+    return img
+
+
 def create_gaussian_window(window_size, sigma, device):
     coords = torch.arange(window_size, dtype=torch.float32, device=device)
     coords -= window_size // 2
@@ -23,10 +32,27 @@ def compute_ssim_batch(img1, img2, window_size=11, sigma=1.5):
     Returns:
         SSIM values for each image in the batch
     """  
+
+    print('before formatting:')
+    print(">> img1 shape:", img1.shape)
+    print(">> img2 shape:", img2.shape)
+
+    img1 = safe_format(img1)
+    img2 = safe_format(img2)
+
+    print('after formatting:')
+    print(">> img1 shape:", img1.shape)
+    print(">> img2 shape:", img2.shape)
+
     # Normalize to [0, 1]
     img1 = img1.float() / 255.0
     img2 = img2.float() / 255.0
-    
+    ...
+
+    print('after normalization:')
+    print(">> img1 shape:", img1.shape)
+    print(">> img2 shape:", img2.shape)
+
     # Create Gaussian Window
     window = create_gaussian_window(window_size, sigma, img1.device)
     C = img1.size(1)
@@ -75,7 +101,7 @@ def compute_ssim(opts, num_gen, max_real=None):
         
     return compute_ssim_direct(opts, num_gen, max_real)
 
-def compute_ssim_direct(opts, num_gen, max_real):
+def compute_ssim_direct(opts, num_gen, max_real): # needs to 
     """Direct SSIM Computation without using feature extraction"""
     import copy
     from torch.utils.data import DataLoader
@@ -139,10 +165,16 @@ def compute_ssim_direct(opts, num_gen, max_real):
             else:
                 hr_generated = G(lr_images)
         
+        print("hr_real raw shape:", hr_real.shape, hr_real.dtype)
+        print("hr_generated raw shape:", hr_generated.shape, hr_generated.dtype)
+
         # Convert from [-1, 1] to [0, 255] range (assuming your GAN outputs in [-1, 1])
         hr_real_uint8 = (hr_real * 127.5 + 127.5).clamp(0, 255)
         hr_gen_uint8 = (hr_generated * 127.5 + 127.5).clamp(0, 255)
-        
+                    
+        print(">> hr_real_uint8:", hr_real_uint8.shape, hr_real_uint8.dtype)
+        print(">> hr_gen_uint8:", hr_gen_uint8.shape, hr_gen_uint8.dtype)
+
         # Compute SSIM
         try:
             batch_ssim = compute_ssim_batch(hr_gen_uint8, hr_real_uint8)
