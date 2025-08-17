@@ -13,6 +13,8 @@ import time
 import json
 import torch
 import dnnlib
+import copy
+import torch.nn.functional as F
 
 from . import metric_utils
 from . import frechet_inception_distance
@@ -20,6 +22,7 @@ from . import kernel_inception_distance
 from . import precision_recall
 from . import inception_score
 from . import structural_similarity_index_measure
+from . import peak_signal_noise_ratio
 
 #----------------------------------------------------------------------------
 
@@ -104,18 +107,14 @@ def pr50k3_full(opts):
 #Custom Metric
 # ---------------------------------------------------------------------------
 @register_metric
-def ssim50k(opts):
+def ssim(opts):
     opts.dataset_kwargs.update(max_size=None)
     mean_ssim, std_ssim = structural_similarity_index_measure.compute_ssim(opts, num_gen=50000, max_real=50000)
     return dict(ssim50k_mean=mean_ssim, ssim50k_std=std_ssim)
 
 
 @register_metric
-def fid50k_en(opts):
-    import copy
-    # For this to work, you need to modify your training script to pass
-    # both HR and LR dataset paths in the opts
-    
+def fid_en(opts):
     # Create HR options (for real images)
     opts_hr = copy.deepcopy(opts)
     if hasattr(opts, 'hr_dataset_kwargs'):
@@ -130,6 +129,37 @@ def fid50k_en(opts):
     
     fid = frechet_inception_distance.compute_fid_en(opts_hr, opts_lr, max_real=50000, num_gen=50000)
     return dict(fid50k_en=fid)
+
+@register_metric
+def psnr_en(opts):
+    """Enhanced PSNR metric for separate LR-HR datasets."""
+    import copy
+    
+    # Create HR options (for ground truth images)
+    opts_hr = copy.deepcopy(opts)
+    if hasattr(opts, 'hr_dataset_kwargs'):
+        opts_hr.dataset_kwargs = opts.hr_dataset_kwargs
+    opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
+    
+    # Create LR options (for generator inputs)
+    opts_lr = copy.deepcopy(opts)  
+    if hasattr(opts, 'lr_dataset_kwargs'):
+        opts_lr.dataset_kwargs = opts.lr_dataset_kwargs
+    opts_lr.dataset_kwargs.update(max_size=None, xflip=False)
+    
+    results = peak_signal_noise_ratio.compute_psnr_enhanced(
+        opts_hr, opts_lr, max_real=50000, num_gen=50000
+    )
+    
+    return {
+        'psnr_en_mean': results['psnr_mean'],
+        'psnr_en_std': results['psnr_std'],
+        'psnr_en_median': results['psnr_median'],
+        'psnr_en_min': results['psnr_min'], 
+        'psnr_en_max': results['psnr_max'],
+        'psnr_en_perfect': results['num_perfect_matches']
+    }
+
 
     
 #----------------------------------------------------------------------------
