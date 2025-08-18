@@ -20,7 +20,6 @@ def compute_psnr_enhanced(opts_hr, opts_lr, max_real=None, num_gen=50000):
     Returns:
         dict: PSNR statistics
     """
-    
     # Clone generator from LR options
     G = copy.deepcopy(opts_lr.G).eval().requires_grad_(False).to(opts_lr.device)
     

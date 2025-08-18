@@ -110,10 +110,11 @@ def compute_ssim_direct(opts, num_gen, max_real): # needs to
     G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
     
     # Build dataset - this should be your HR dataset for comparison
-    dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs)
+    lr_dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs['G'])
+    hr_dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs['D'])
     
     batch_size = min(32, num_gen)  # Use smaller batch size to avoid memory issues
-    num_batches = min((num_gen + batch_size - 1) // batch_size, len(dataset) // batch_size)
+    num_batches = min((num_gen + batch_size - 1) // batch_size, len(lr_dataset) // batch_size)
     
     ssim_scores = []
     processed = 0
@@ -121,69 +122,43 @@ def compute_ssim_direct(opts, num_gen, max_real): # needs to
     # Create progress tracker if available
     progress = opts.progress.sub(tag='SSIM computation', num_items=num_gen) if hasattr(opts, 'progress') else None
     
-    # Create dataloader
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, num_workers=0)
-    
-    for batch_idx, batch_data in enumerate(dataloader):
-        if batch_idx >= num_batches or processed >= num_gen:
-            break
-        
-        # Handle different dataset formats
-        if isinstance(batch_data, (list, tuple)):
-            if len(batch_data) >= 2:
-                # Format: (lr_images, hr_images, [labels])
-                lr_images = batch_data[0].to(opts.device)
-                hr_real = batch_data[1].to(opts.device)
-                labels = batch_data[2] if len(batch_data) > 2 else None
-            else:
-                # Format: (images, [labels]) - assume this is HR, generate LR by downsampling
-                hr_real = batch_data[0].to(opts.device)
-                # Simple downsampling for LR (you might want to use your actual LR generation method)
-                lr_images = F.interpolate(hr_real, scale_factor=0.25, mode='bilinear', align_corners=False)
-                lr_images = F.interpolate(lr_images, size=hr_real.shape[-2:], mode='bilinear', align_corners=False)
-                labels = batch_data[1] if len(batch_data) > 1 else None
-        else:
-            # Single tensor - assume HR
-            hr_real = batch_data.to(opts.device)
-            lr_images = F.interpolate(hr_real, scale_factor=0.25, mode='bilinear', align_corners=False)
-            lr_images = F.interpolate(lr_images, size=hr_real.shape[-2:], mode='bilinear', align_corners=False)
-            labels = None
-        
-        # Handle conditional generation
-        if G.c_dim > 0:
-            if labels is not None:
-                c = labels.to(opts.device)
-            else:
-                c = torch.zeros([lr_images.shape[0], G.c_dim], device=opts.device)
-        else:
-            c = None
-            
-        # Generate HR images
+    # Create dataloaders for LR and HR separately
+    lr_dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs['G'])
+    hr_dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs['D'])
+
+    lr_loader = DataLoader(lr_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+    hr_loader = DataLoader(hr_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
+
+    for (lr_batch, _), (hr_batch, _) in zip(lr_loader, hr_loader):
+        # move to device
+        lr_images = lr_batch.to(opts.device)
+        hr_real   = hr_batch.to(opts.device)
+
+        # generate HR from LR
         with torch.no_grad():
-            if c is not None:
+            if G.c_dim > 0:
+                c = torch.zeros([lr_images.shape[0], G.c_dim], device=opts.device)
                 hr_generated = G(lr_images, c)
             else:
                 hr_generated = G(lr_images)
-        
+
         print("hr_real raw shape:", hr_real.shape, hr_real.dtype)
         print("hr_generated raw shape:", hr_generated.shape, hr_generated.dtype)
 
-        # Convert from [-1, 1] to [0, 255] range (assuming your GAN outputs in [-1, 1])
+        # Convert from [-1, 1] to [0, 255]
         hr_real_uint8 = (hr_real * 127.5 + 127.5).clamp(0, 255)
-        hr_gen_uint8 = (hr_generated * 127.5 + 127.5).clamp(0, 255)
-                    
+        hr_gen_uint8  = (hr_generated * 127.5 + 127.5).clamp(0, 255)
+
         print(">> hr_real_uint8:", hr_real_uint8.shape, hr_real_uint8.dtype)
         print(">> hr_gen_uint8:", hr_gen_uint8.shape, hr_gen_uint8.dtype)
 
-        # Compute SSIM
         try:
             batch_ssim = compute_ssim_batch(hr_gen_uint8, hr_real_uint8)
             ssim_scores.extend(batch_ssim.cpu().numpy())
         except Exception as e:
-            print(f"Error computing SSIM for batch {batch_idx}: {e}")
-            # Add NaN values for failed batches
+            print(f"Error computing SSIM: {e}")
             ssim_scores.extend([float('nan')] * lr_images.shape[0])
-        
+
         processed += lr_images.shape[0]
         if progress is not None:
             progress.update(min(processed, num_gen))
