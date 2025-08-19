@@ -110,8 +110,8 @@ def compute_ssim_direct(opts, num_gen, max_real): # needs to
     G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
     
     # Build dataset - this should be your HR dataset for comparison
-    lr_dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs['G'])
-    hr_dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs['D'])
+    lr_dataset = dnnlib.util.construct_class_by_name(**opts.G_dataset_kwargs)
+    hr_dataset = dnnlib.util.construct_class_by_name(**opts.D_dataset_kwargs)
     
     batch_size = min(32, num_gen)  # Use smaller batch size to avoid memory issues
     num_batches = min((num_gen + batch_size - 1) // batch_size, len(lr_dataset) // batch_size)
@@ -123,8 +123,8 @@ def compute_ssim_direct(opts, num_gen, max_real): # needs to
     progress = opts.progress.sub(tag='SSIM computation', num_items=num_gen) if hasattr(opts, 'progress') else None
     
     # Create dataloaders for LR and HR separately
-    lr_dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs['G'])
-    hr_dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs['D'])
+    lr_dataset = dnnlib.util.construct_class_by_name(**opts.G_dataset_kwargs)
+    hr_dataset = dnnlib.util.construct_class_by_name(**opts.D_dataset_kwargs)
 
     lr_loader = DataLoader(lr_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
     hr_loader = DataLoader(hr_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
