@@ -57,10 +57,14 @@ def compute_fid_en(opts_hr, opts_lr, max_real, num_gen):
         opts=opts_hr, detector_url=detector_url, detector_kwargs=detector_kwargs,
         rel_lo=0, rel_hi=0, capture_mean_cov=True, max_items=max_real).get_mean_cov()
 
+    # print(">>After : compute_feature_stats_for_dataset")
+
     # Compute features for generated HR images (from LR inputs)
     mu_gen, sigma_gen = metric_utils.compute_feature_stats_for_generator(
         opts=opts_lr, detector_url=detector_url, detector_kwargs=detector_kwargs,
         rel_lo=0, rel_hi=1, capture_mean_cov=True, max_items=num_gen).get_mean_cov()
+
+    # print(">>After : compute_feature_stats_for_generator")
 
     if opts_hr.rank != 0:
         return float('nan')

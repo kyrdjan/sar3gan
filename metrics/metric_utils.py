@@ -248,94 +248,76 @@ def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_l
 
 from torch.utils.data import DataLoader
 
-def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, batch_gen=None, **stats_kwargs):
-    """
-    Modified for super-resolution: generates HR images from LR inputs instead of from noise.
-    """
-    if batch_gen is None:
-        batch_gen = min(batch_size, 4)
-    assert batch_size % batch_gen == 0
+from torch.utils.data import DataLoader
+import copy
+import torch
 
-    # Clone generator
+def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs,
+                                        rel_lo=0, rel_hi=1, batch_size=64, **stats_kwargs):
+    """
+    Optimized for super-resolution: generates HR images from LR inputs instead of from noise.
+    - Uses full batches directly (fewer generator calls).
+    - Keeps data in float32 for detector (avoids uint8↔float conversions).
+    """
+    # Clone generator in eval mode
     G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
     use_labels = (G.c_dim != 0)
 
-    # Build dataset - CRITICAL: This should be your LR dataset (G_training_set)
-    # The opts.dataset_kwargs should point to your LR dataset, not HR dataset
+    # Build LR dataset
     dataset = dnnlib.util.construct_class_by_name(**opts.G_dataset_kwargs)
-    
-    # Create dataloader with proper error handling
-    data_loader_kwargs = dict(pin_memory=True, num_workers=0, drop_last=False)
-    dataloader = DataLoader(dataset, batch_size=batch_gen, shuffle=False, **data_loader_kwargs)
-    
-    # Calculate total items available
-    total_available = len(dataset)
-    
+
+    # DataLoader (increase num_workers for speed if dataset is large)
+    data_loader_kwargs = dict(pin_memory=True, num_workers=2, drop_last=False)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False, **data_loader_kwargs)
+
     # Init feature stats
     stats = FeatureStats(**stats_kwargs)
     assert stats.max_items is not None
-    progress = opts.progress.sub(tag='generator features', num_items=stats.max_items, rel_lo=rel_lo, rel_hi=rel_hi)
+    progress = opts.progress.sub(tag='generator features', num_items=stats.max_items,
+                                 rel_lo=rel_lo, rel_hi=rel_hi)
+
+    # Feature detector
     detector = get_feature_detector(url=detector_url, device=opts.device,
                                     num_gpus=opts.num_gpus, rank=opts.rank, verbose=progress.verbose)
 
-    # Main loop - cycle through dataset as needed
+    # Main loop
     data_iter = iter(dataloader)
-    processed_items = 0
-    
     while not stats.is_full():
-        images = []
-        
-        for _i in range(batch_size // batch_gen):
-            try:
-                batch = next(data_iter)
-            except StopIteration:
-                # Restart iterator when dataset is exhausted
-                data_iter = iter(dataloader)
-                batch = next(data_iter)
+        try:
+            batch = next(data_iter)
+        except StopIteration:
+            # Restart dataset if we still need more samples
+            data_iter = iter(dataloader)
+            batch = next(data_iter)
 
-            # Handle batch data - assume (lr_image, label) or (lr_image, hr_image)
-            lr = batch[0].to(opts.device)
-            
-            # Handle labels/conditioning
-            if use_labels and len(batch) > 1:
-                # Check if second element is a label (1D) or HR image (3D+)
-                second_elem = batch[1]
-                if len(second_elem.shape) <= 2:  # Likely a label
-                    c = second_elem.to(opts.device)
-                else:  # Likely an HR image, create dummy labels
-                    c = torch.zeros([lr.shape[0], G.c_dim], device=opts.device)
-            else:
-                c = torch.zeros([lr.shape[0], G.c_dim], device=opts.device) if use_labels else None
+        lr = batch[0].to(opts.device)
 
-            # Generate HR images
-            with torch.no_grad():
-                if use_labels:
-                    img = G(lr, c)
-                else:
-                    img = G(lr)
-                
-                # Handle different output ranges
-                if img.min() < 0:  # Assume [-1, 1] range
-                    img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-                else:  # Assume [0, 1] or [0, 255] range
-                    if img.max() <= 1.0:  # [0, 1] range
-                        img = (img * 255).clamp(0, 255).to(torch.uint8)
-                    else:  # Already [0, 255]
-                        img = img.clamp(0, 255).to(torch.uint8)
-                
-                images.append(img)
-            
-            processed_items += lr.shape[0]
+        # Handle labels/conditioning
+        if use_labels and len(batch) > 1:
+            second = batch[1]
+            if second.ndim <= 2:   # labels
+                c = second.to(opts.device)
+            else:                  # HR images (ignore, use dummy labels)
+                c = torch.zeros([lr.size(0), G.c_dim], device=opts.device)
+        else:
+            c = torch.zeros([lr.size(0), G.c_dim], device=opts.device) if use_labels else None
 
-        # Concatenate all images in this batch
-        images = torch.cat(images)
-        
-        # Convert grayscale to RGB if needed
-        if images.shape[1] == 1:
-            images = images.repeat([1, 3, 1, 1])
+        # Generate HR images
+        with torch.no_grad():
+            img = G(lr, c) if use_labels else G(lr)
+
+        # Normalize to [0,1] float32
+        if img.min() < 0:          # [-1,1]
+            img = (img + 1) / 2
+        elif img.max() > 1:        # [0,255]
+            img = img / 255.0
+
+        # Ensure RGB
+        if img.shape[1] == 1:
+            img = img.repeat(1, 3, 1, 1)
 
         # Extract features
-        features = detector(images.float(), **detector_kwargs)
+        features = detector(img, **detector_kwargs)
         stats.append_torch(features, num_gpus=opts.num_gpus, rank=opts.rank)
         progress.update(stats.num_items)
 

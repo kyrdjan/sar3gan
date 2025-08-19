@@ -138,7 +138,7 @@ def fid_en(opts):
     
     print("option lr:", opts_lr.G_dataset_kwargs)
     
-    fid = frechet_inception_distance.compute_fid_en(opts_hr, opts_lr, max_real=50000, num_gen=50000)
+    fid = frechet_inception_distance.compute_fid_en(opts_hr, opts_lr, max_real=10000, num_gen=10000)
     return dict(fid50k_en=fid)
 
 @register_metric
