@@ -522,7 +522,8 @@ def training_loop(
                 result_dict = metric_main.calc_metric(
                 metric=metric, 
                 G=snapshot_in_domain['G_ema'],
-                dataset_kwargs={'G': G_training_set_kwargs, 'D': D_training_set_kwargs}, 
+                G_dataset_kwargs =  G_training_set_kwargs,
+                D_dataset_kwargs =  D_training_set_kwargs, 
                 num_gpus=num_gpus, rank=rank, device=device
             )
                 if rank == 0:
@@ -534,7 +535,8 @@ def training_loop(
                 result_dict = metric_main.calc_metric(
                     metric=metric, 
                     G=snapshot_cross_domain['G_ema'],
-                    dataset_kwargs={'G': VG_training_set_kwargs, 'D': VD_training_set_kwargs}, 
+                    G_dataset_kwargs =  VG_training_set_kwargs,
+                    D_dataset_kwargs =  VD_training_set_kwargs, 
                     num_gpus=num_gpus, rank=rank, device=device
                 )
 

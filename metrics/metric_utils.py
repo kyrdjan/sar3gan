@@ -21,16 +21,17 @@ import dnnlib
 #----------------------------------------------------------------------------
 
 class MetricOptions:
-    def __init__(self, G=None, G_kwargs={}, dataset_kwargs={}, num_gpus=1, rank=0, device=None, progress=None, cache=True):
+    def __init__(self, G=None, G_kwargs={}, G_dataset_kwargs={}, D_dataset_kwargs={}, num_gpus=1, rank=0, device=None, progress=None, cache=True):
         assert 0 <= rank < num_gpus
-        self.G              = G
-        self.G_kwargs       = dnnlib.EasyDict(G_kwargs)
-        self.dataset_kwargs = dnnlib.EasyDict(dataset_kwargs)
-        self.num_gpus       = num_gpus
-        self.rank           = rank
-        self.device         = device if device is not None else torch.device('cuda', rank)
-        self.progress       = progress.sub() if progress is not None and rank == 0 else ProgressMonitor()
-        self.cache          = cache
+        self.G                  = G
+        self.G_kwargs           = dnnlib.EasyDict(G_kwargs)
+        self.G_dataset_kwargs    = dnnlib.EasyDict(G_dataset_kwargs)
+        self.D_dataset_kwargs     = dnnlib.EasyDict(D_dataset_kwargs)
+        self.num_gpus           = num_gpus
+        self.rank               = rank
+        self.device             = device if device is not None else torch.device('cuda', rank)
+        self.progress           = progress.sub() if progress is not None and rank == 0 else ProgressMonitor()
+        self.cache              = cache
 
 #----------------------------------------------------------------------------
 
@@ -54,7 +55,7 @@ def get_feature_detector(url, device=torch.device('cpu'), num_gpus=1, rank=0, ve
 
 #----------------------------------------------------------------------------
 
-def iterate_random_labels(opts, batch_size):
+def iterate_random_labels(opts, batch_size): # no need
     if opts.G.c_dim == 0:
         c = torch.zeros([batch_size, opts.G.c_dim], device=opts.device)
         while True:
@@ -194,7 +195,7 @@ class ProgressMonitor:
 #----------------------------------------------------------------------------
 
 def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, data_loader_kwargs=None, max_items=None, **stats_kwargs):
-    dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs)
+    dataset = dnnlib.util.construct_class_by_name(**opts.D_dataset_kwargs)
     if data_loader_kwargs is None:
         data_loader_kwargs = dict(pin_memory=True, num_workers=3, prefetch_factor=2)
 
@@ -202,7 +203,7 @@ def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_l
     cache_file = None
     if opts.cache:
         # Choose cache file name.
-        args = dict(dataset_kwargs=opts.dataset_kwargs, detector_url=detector_url, detector_kwargs=detector_kwargs, stats_kwargs=stats_kwargs)
+        args = dict(dataset_kwargs=opts.D_dataset_kwargs, detector_url=detector_url, detector_kwargs=detector_kwargs, stats_kwargs=stats_kwargs)
         md5 = hashlib.md5(repr(sorted(args.items())).encode('utf-8'))
         cache_tag = f'{dataset.name}-{get_feature_detector_name(detector_url)}-{md5.hexdigest()}'
         cache_file = dnnlib.make_cache_dir_path('gan-metrics', cache_tag + '.pkl')
@@ -261,7 +262,7 @@ def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel
 
     # Build dataset - CRITICAL: This should be your LR dataset (G_training_set)
     # The opts.dataset_kwargs should point to your LR dataset, not HR dataset
-    dataset = dnnlib.util.construct_class_by_name(**opts.dataset_kwargs)
+    dataset = dnnlib.util.construct_class_by_name(**opts.G_dataset_kwargs)
     
     # Create dataloader with proper error handling
     data_loader_kwargs = dict(pin_memory=True, num_workers=0, drop_last=False)
