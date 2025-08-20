@@ -143,8 +143,8 @@ def training_loop(
     aug_scheduler           = None,
     total_kimg              = 25000,    # Total length of the training, measured in thousands of real images.
     kimg_per_tick           = 4,        # Progress snapshot interval.
-    image_snapshot_ticks    = 50,       # How often to save image snapshots? None = disable.
-    network_snapshot_ticks  = 50,       # How often to save network snapshots? None = disable.
+    image_snapshot_ticks    = 1,       # How often to save image snapshots? None = disable.
+    network_snapshot_ticks  = 1,       # How often to save network snapshots? None = disable.
     resume_pkl              = None,     # Network pickle to resume training from.
     cudnn_benchmark         = True,     # Enable torch.backends.cudnn.benchmark?
     abort_fn                = None,     # Callback function for determining whether to abort training. Must return consistent results across ranks.
@@ -361,9 +361,23 @@ def training_loop(
             phase.opt.zero_grad(set_to_none=True)
             phase.module.requires_grad_(True)
 
-            # AccumulateDiscriminatorGradients(gen_z, real_img, real_c, gamma, gain, self.preprocessor)
-            for lr, hr, c in zip(lr_img, hr_img, label):
-                loss.accumulate_gradients(phase=phase.name, real_img=hr, real_c=c, gen_z=lr, gamma=cur_gamma,gain=num_gpus * phase.batch_gpu / batch_size)
+            # AccumulateDiscriminatorGradients(gen_z, real_img, real_c, gamma, gain, self.preprocessor) # old
+            # for lr, hr, c in zip(lr_img, hr_img, label):
+
+            start_time = time.time()
+
+            for lr, hr, c in zip(lr_img, hr_img, label): # NEW
+                loss.accumulate_gradients(
+                    phase=phase.name,
+                    real_img=hr,
+                    real_c=c,
+                    gen_z=lr,
+                    gamma=cur_gamma,
+                    gain=num_gpus * phase.batch_gpu / batch_size
+                )
+
+            end_time = time.time()
+            print(f"[DEBUG] Loop over {len(label)} items took {end_time - start_time:.4f} seconds")
 
             phase.module.requires_grad_(False)
 
@@ -397,10 +411,18 @@ def training_loop(
         cur_nimg += batch_size
         batch_idx += 1
 
+        # --- Add this snippet ---
+        if batch_idx % 50 == 0 and rank == 0:
+            print(f"iter {batch_idx}, kimg={cur_nimg/1e3:.2f}")
+
         # Perform maintenance tasks once per tick.
         done = (cur_nimg >= total_kimg * 1000)
         if (not done) and (cur_tick != 0) and (cur_nimg < tick_start_nimg + kimg_per_tick * 1000):
             continue
+
+        iters_per_tick = int(kimg_per_tick * 1000 / batch_size)
+        if rank == 0:
+            print(f"iters_per_tick: {iters_per_tick}")
 
         # Print status line, accumulating the same information in training_stats.
         tick_end_time = time.time()
@@ -528,7 +550,7 @@ def training_loop(
             )
                 if rank == 0:
                     metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
-                stats_metrics.update({f"{metric}_in_domain": result_dict.results})
+                stats_metrics.update(result_dict.results)
 
             # (B) Cross-domain Validation
             for metric in metrics:
@@ -542,7 +564,7 @@ def training_loop(
 
                 if rank == 0:
                     metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
-                stats_metrics.update({f"{metric}_cross_domain": result_dict.results})
+                stats_metrics.update(result_dict.results)
 
         # Cleanup
         del snapshot_in_domain, snapshot_cross_domain
