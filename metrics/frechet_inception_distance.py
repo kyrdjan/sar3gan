@@ -69,10 +69,26 @@ def compute_fid_en(opts_hr, opts_lr, max_real, num_gen):
 
     if opts_hr.rank != 0:
         return float('nan')
+    
+    eps = 1e-6
+    sigma_real += np.eye(sigma_real.shape[0]) * eps
+    sigma_gen  += np.eye(sigma_gen.shape[0]) * eps
 
-    m = np.square(mu_gen - mu_real).sum()
-    s, _ = scipy.linalg.sqrtm(np.dot(sigma_gen, sigma_real), disp=False) # pylint: disable=no-member
-    fid = np.real(m + np.trace(sigma_gen + sigma_real - s * 2))
+
+    covmean, info = scipy.linalg.sqrtm(sigma_gen @ sigma_real, disp=False)
+
+    # If result has tiny imaginary components, discard them
+    if np.iscomplexobj(covmean):
+        covmean = covmean.real
+
+
+    m = np.sum((mu_gen - mu_real)**2)
+    fid = m + np.trace(sigma_gen + sigma_real - 2*covmean)
+
+
+    # m = np.square(mu_gen - mu_real).sum()
+    # s, _ = scipy.linalg.sqrtm(np.dot(sigma_gen, sigma_real), disp=False) # pylint: disable=no-member
+    # fid = np.real(m + np.trace(sigma_gen + sigma_real - s * 2))
     return float(fid)
 
     
