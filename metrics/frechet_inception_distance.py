@@ -52,6 +52,7 @@ def compute_fid_en(opts_hr, opts_lr, max_real, num_gen):
     detector_url = 'https://api.ngc.nvidia.com/v2/models/nvidia/research/stylegan3/versions/1/files/metrics/inception-2015-12-05.pkl'
     detector_kwargs = dict(return_features=True) # Return raw features before the softmax layer.
 
+
     # Compute features for real HR images
     mu_real, sigma_real = metric_utils.compute_feature_stats_for_dataset(
         opts=opts_hr, detector_url=detector_url, detector_kwargs=detector_kwargs,

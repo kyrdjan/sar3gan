@@ -248,97 +248,55 @@ def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_l
 
 from torch.utils.data import DataLoader
 
-def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, batch_gen=None, **stats_kwargs):
-    """
-    Modified for super-resolution: generates HR images from LR inputs instead of from noise.
-    """
-    if batch_gen is None:
-        batch_gen = min(batch_size, 4)
-    assert batch_size % batch_gen == 0
-
-    # Clone generator
-    G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
-    use_labels = (G.c_dim != 0)
-
-    # Build dataset - CRITICAL: This should be your LR dataset (G_training_set)
-    # The opts.dataset_kwargs should point to your LR dataset, not HR dataset
+def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, data_loader_kwargs=None, max_items=None, **stats_kwargs):
+    # Construct dataset from G_dataset_kwargs
     dataset = dnnlib.util.construct_class_by_name(**opts.G_dataset_kwargs)
-    
-    # Create dataloader with proper error handling
-    data_loader_kwargs = dict(pin_memory=True, num_workers=0, drop_last=False)
-    dataloader = DataLoader(dataset, batch_size=batch_gen, shuffle=False, **data_loader_kwargs)
-    
-    # Calculate total items available
-    total_available = len(dataset)
-    
-    # Init feature stats
-    stats = FeatureStats(**stats_kwargs)
-    assert stats.max_items is not None
-    progress = opts.progress.sub(tag='generator features', num_items=stats.max_items, rel_lo=rel_lo, rel_hi=rel_hi)
-    detector = get_feature_detector(url=detector_url, device=opts.device,
-                                    num_gpus=opts.num_gpus, rank=opts.rank, verbose=progress.verbose)
+    if data_loader_kwargs is None:
+        data_loader_kwargs = dict(pin_memory=True, num_workers=3, prefetch_factor=2)
 
-    # Main loop - cycle through dataset as needed
-    data_iter = iter(dataloader)
-    processed_items = 0
-    
-    while not stats.is_full():
-        images = []
-        
-        for _i in range(batch_size // batch_gen):
-            try:
-                batch = next(data_iter)
-            except StopIteration:
-                # Restart iterator when dataset is exhausted
-                data_iter = iter(dataloader)
-                batch = next(data_iter)
+    # Try to lookup from cache.
+    cache_file = None
+    if opts.cache:
+        # Choose cache file name.
+        args = dict(dataset_kwargs=opts.G_dataset_kwargs, detector_url=detector_url, detector_kwargs=detector_kwargs, stats_kwargs=stats_kwargs)
+        md5 = hashlib.md5(repr(sorted(args.items())).encode('utf-8'))
+        cache_tag = f'{dataset.name}-{get_feature_detector_name(detector_url)}-{md5.hexdigest()}'
+        cache_file = dnnlib.make_cache_dir_path('gan-metrics', cache_tag + '.pkl')
 
-            # Handle batch data - assume (lr_image, label) or (lr_image, hr_image)
-            lr = batch[0].to(opts.device)
-            
-            # Handle labels/conditioning
-            if use_labels and len(batch) > 1:
-                # Check if second element is a label (1D) or HR image (3D+)
-                second_elem = batch[1]
-                if len(second_elem.shape) <= 2:  # Likely a label
-                    c = second_elem.to(opts.device)
-                else:  # Likely an HR image, create dummy labels
-                    c = torch.zeros([lr.shape[0], G.c_dim], device=opts.device)
-            else:
-                c = torch.zeros([lr.shape[0], G.c_dim], device=opts.device) if use_labels else None
+        # Check if the file exists (all processes must agree).
+        flag = os.path.isfile(cache_file) if opts.rank == 0 else False
+        if opts.num_gpus > 1:
+            flag = torch.as_tensor(flag, dtype=torch.float32, device=opts.device)
+            torch.distributed.broadcast(tensor=flag, src=0)
+            flag = (float(flag.cpu()) != 0)
 
-            # Generate HR images
-            with torch.no_grad():
-                if use_labels:
-                    img = G(lr, c)
-                else:
-                    img = G(lr)
-                
-                # Handle different output ranges
-                if img.min() < 0:  # Assume [-1, 1] range
-                    img = (img * 127.5 + 128).clamp(0, 255).to(torch.uint8)
-                else:  # Assume [0, 1] or [0, 255] range
-                    if img.max() <= 1.0:  # [0, 1] range
-                        img = (img * 255).clamp(0, 255).to(torch.uint8)
-                    else:  # Already [0, 255]
-                        img = img.clamp(0, 255).to(torch.uint8)
-                
-                images.append(img)
-            
-            processed_items += lr.shape[0]
+        # Load.
+        if flag:
+            return FeatureStats.load(cache_file)
 
-        # Concatenate all images in this batch
-        images = torch.cat(images)
-        
-        # Convert grayscale to RGB if needed
+    # Initialize.
+    num_items = len(dataset)
+    if max_items is not None:
+        num_items = min(num_items, max_items)
+    stats = FeatureStats(max_items=num_items, **stats_kwargs)
+    progress = opts.progress.sub(tag='G dataset features', num_items=num_items, rel_lo=rel_lo, rel_hi=rel_hi)
+    detector = get_feature_detector(url=detector_url, device=opts.device, num_gpus=opts.num_gpus, rank=opts.rank, verbose=progress.verbose)
+
+    # Main loop.
+    item_subset = [(i * opts.num_gpus + opts.rank) % num_items for i in range((num_items - 1) // opts.num_gpus + 1)]
+    for images, _labels in torch.utils.data.DataLoader(dataset=dataset, sampler=item_subset, batch_size=batch_size, **data_loader_kwargs):
         if images.shape[1] == 1:
             images = images.repeat([1, 3, 1, 1])
-
-        # Extract features
-        features = detector(images.float(), **detector_kwargs)
+        features = detector(images.to(opts.device), **detector_kwargs)
         stats.append_torch(features, num_gpus=opts.num_gpus, rank=opts.rank)
         progress.update(stats.num_items)
 
+    # Save to cache.
+    if cache_file is not None and opts.rank == 0:
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        temp_file = cache_file + '.' + uuid.uuid4().hex
+        stats.save(temp_file)
+        os.replace(temp_file, cache_file) # atomic
     return stats
 
 #----------------------------------------------------------------------------
