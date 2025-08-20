@@ -71,11 +71,6 @@ def calc_metric(metric, **kwargs): # See metric_utils.MetricOptions for the full
 
 def report_metric(result_dict, run_dir=None, snapshot_pkl=None):
 
-    print('run_dir:', run_dir)
-    print()
-    print('snapshots_pkl', snapshot_pkl)
-    print()
-
     metric = result_dict['metric']
     assert is_valid_metric(metric)
     if run_dir is not None and snapshot_pkl is not None:
@@ -90,25 +85,25 @@ def report_metric(result_dict, run_dir=None, snapshot_pkl=None):
 #----------------------------------------------------------------------------
 # Recommended metrics.
 
-# understand why 50k is the defualt.
-@register_metric
-# original FID
-def fid50k_full(opts):
-    opts.dataset_kwargs.update(max_size=None, xflip=False)
-    fid = frechet_inception_distance.compute_fid(opts, max_real=None, num_gen=50000)
-    return dict(fid50k_full=fid)
+# # understand why 50k is the defualt.
+# @register_metric
+# # original FID
+# def fid50k_full(opts):
+#     opts.dataset_kwargs.update(max_size=None, xflip=False)
+#     fid = frechet_inception_distance.compute_fid(opts, max_real=None, num_gen=50000)
+#     return dict(fid50k_full=fid)
 
-@register_metric
-def kid50k_full(opts):
-    opts.dataset_kwargs.update(max_size=None, xflip=False)
-    kid = kernel_inception_distance.compute_kid(opts, max_real=1000000, num_gen=50000, num_subsets=100, max_subset_size=1000)
-    return dict(kid50k_full=kid)
+# @register_metric
+# def kid50k_full(opts):
+#     opts.dataset_kwargs.update(max_size=None, xflip=False)
+#     kid = kernel_inception_distance.compute_kid(opts, max_real=1000000, num_gen=50000, num_subsets=100, max_subset_size=1000)
+#     return dict(kid50k_full=kid)
 
-@register_metric
-def pr50k3_full(opts):
-    opts.dataset_kwargs.update(max_size=None, xflip=False)
-    precision, recall = precision_recall.compute_pr(opts, max_real=200000, num_gen=50000, nhood_size=3, row_batch_size=10000, col_batch_size=10000)
-    return dict(pr50k3_full_precision=precision, pr50k3_full_recall=recall)
+# @register_metric
+# def pr50k3_full(opts):
+#     opts.dataset_kwargs.update(max_size=None, xflip=False)
+#     precision, recall = precision_recall.compute_pr(opts, max_real=200000, num_gen=50000, nhood_size=3, row_batch_size=10000, col_batch_size=10000)
+#     return dict(pr50k3_full_precision=precision, pr50k3_full_recall=recall)
 
 #Custom Metric
 # ---------------------------------------------------------------------------
@@ -122,23 +117,19 @@ def ssim(opts):
 
 @register_metric
 def fid_en(opts):
-    # Create HR options (for real images)
+    # Real dataset (HR)
     opts_hr = copy.deepcopy(opts)
-    if hasattr(opts, 'D_dataset_kwargs'):
-        opts_hr.D_dataset_kwargs = opts.D_dataset_kwargs
-    opts_hr.D_dataset_kwargs.update(max_size=None, xflip=False)
-    
-    print("option hr:", opts_hr.D_dataset_kwargs)
+    opts_hr.dataset_kwargs = copy.deepcopy(opts.D_dataset_kwargs)
+    opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
 
-    # Create LR options (for generator inputs)  
+    # Generator dataset (LR)
     opts_lr = copy.deepcopy(opts)
-    if hasattr(opts, 'G_dataset_kwargs'):
-        opts_lr.G_dataset_kwargs = opts.G_dataset_kwargs
-    opts_lr.G_dataset_kwargs.update(max_size=None, xflip=False)
-    
-    print("option lr:", opts_lr.G_dataset_kwargs)
-    
-    fid = frechet_inception_distance.compute_fid_en(opts_hr, opts_lr, max_real=10000, num_gen=10000)
+    opts_lr.dataset_kwargs = copy.deepcopy(opts.G_dataset_kwargs)
+    opts_lr.dataset_kwargs.update(max_size=None, xflip=False)
+
+    fid = frechet_inception_distance.compute_fid_en(
+        opts_hr, opts_lr, max_real=10000, num_gen=10000
+    )
     return dict(fid50k_en=fid)
 
 @register_metric
