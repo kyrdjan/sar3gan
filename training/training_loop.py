@@ -149,6 +149,7 @@ def training_loop(
     cudnn_benchmark         = True,     # Enable torch.backends.cudnn.benchmark?
     abort_fn                = None,     # Callback function for determining whether to abort training. Must return consistent results across ranks.
     progress_fn             = None,     # Callback function for updating training progress. Called for all ranks.
+    metric_eval_ticks       = 200,      # How often to evaluate metrics? None = disable.      
 ):
     # Initialize.
     start_time = time.time()
@@ -512,37 +513,38 @@ def training_loop(
                 with open(snapshot_pkl, 'wb') as f:
                     pickle.dump(snapshot_cross_domain, f)
 
-        # Evaluate metrics. # TODO: NEEDS TO WORK FOR SSIM
-        if (snapshot_in_domain is not None) and (snapshot_cross_domain is not None) and (len(metrics) > 0):
-            if rank == 0:
-                print('Evaluating metrics...')
-
-            # (A) In-domain Validation
-            for metric in metrics:
-                result_dict = metric_main.calc_metric(
-                metric=metric, 
-                G=snapshot_in_domain['G_ema'],
-                G_dataset_kwargs =  G_training_set_kwargs,
-                D_dataset_kwargs =  D_training_set_kwargs, 
-                num_gpus=num_gpus, rank=rank, device=device
-            )
+        # Evaluate metrics.
+        if (metric_eval_ticks is not None) and (done or cur_tick % metric_eval_ticks == 0):
+            if (snapshot_in_domain is not None) and (snapshot_cross_domain is not None) and (len(metrics) > 0):
                 if rank == 0:
-                    metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
-                stats_metrics.update({f"{metric}_in_domain": result_dict.results})
+                    print('Evaluating metrics...')
 
-            # (B) Cross-domain Validation
-            for metric in metrics:
-                result_dict = metric_main.calc_metric(
+                # (A) In-domain Validation
+                for metric in metrics:
+                    result_dict = metric_main.calc_metric(
                     metric=metric, 
-                    G=snapshot_cross_domain['G_ema'],
-                    G_dataset_kwargs =  VG_training_set_kwargs,
-                    D_dataset_kwargs =  VD_training_set_kwargs, 
+                    G=snapshot_in_domain['G_ema'],
+                    G_dataset_kwargs =  G_training_set_kwargs,
+                    D_dataset_kwargs =  D_training_set_kwargs, 
                     num_gpus=num_gpus, rank=rank, device=device
                 )
+                    if rank == 0:
+                        metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
+                    stats_metrics.update({f"{metric}_in_domain": result_dict.results})
 
-                if rank == 0:
-                    metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
-                stats_metrics.update({f"{metric}_cross_domain": result_dict.results})
+                # (B) Cross-domain Validation
+                for metric in metrics:
+                    result_dict = metric_main.calc_metric(
+                        metric=metric, 
+                        G=snapshot_cross_domain['G_ema'],
+                        G_dataset_kwargs =  VG_training_set_kwargs,
+                        D_dataset_kwargs =  VD_training_set_kwargs, 
+                        num_gpus=num_gpus, rank=rank, device=device
+                    )
+
+                    if rank == 0:
+                        metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
+                    stats_metrics.update({f"{metric}_cross_domain": result_dict.results})
 
         # Cleanup
         del snapshot_in_domain, snapshot_cross_domain
