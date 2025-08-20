@@ -194,7 +194,7 @@ class ProgressMonitor:
 
 #----------------------------------------------------------------------------
 
-def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=64, data_loader_kwargs=None, max_items=None, **stats_kwargs):
+def compute_feature_stats_for_dataset(opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1, batch_size=16, data_loader_kwargs=None, max_items=None, **stats_kwargs):
     dataset = dnnlib.util.construct_class_by_name(**opts.D_dataset_kwargs)
     if data_loader_kwargs is None:
         data_loader_kwargs = dict(pin_memory=True, num_workers=3, prefetch_factor=2)
@@ -253,7 +253,7 @@ import copy
 import torch
 
 def compute_feature_stats_for_generator(opts, detector_url, detector_kwargs,
-                                        rel_lo=0, rel_hi=1, batch_size=64, **stats_kwargs):
+                                        rel_lo=0, rel_hi=1, batch_size=16, **stats_kwargs):
     """
     Optimized for super-resolution: generates HR images from LR inputs instead of from noise.
     - Uses full batches directly (fewer generator calls).
