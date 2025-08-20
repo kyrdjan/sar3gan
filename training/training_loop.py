@@ -115,7 +115,7 @@ def remap_optimizer_state_dict(state_dict, device):
 
 #----------------------------------------------------------------------------
 
-#TODO: CONNECT WITH G AND D's DATASET
+#TODO: TEST
 def training_loop(
     run_dir                 = '.',      # Output directory.
     G_training_set_kwargs   = {},       # Options for G training set.
@@ -136,15 +136,15 @@ def training_loop(
     random_seed             = 0,        # Global random seed.
     num_gpus                = 1,        # Number of GPUs participating in the training.
     rank                    = 0,        # Rank of the current process in [0, num_gpus[.
-    batch_size              = 4,        # Total batch size for one training iteration. Can be larger than batch_gpu * num_gpus.
-    g_batch_gpu             = 4,        # Number of samples processed at a time by one GPU.
-    d_batch_gpu             = 4,        # Number of samples processed at a time by one GPU.
+    batch_size              = 16,        # Total batch size for one training iteration. Can be larger than batch_gpu * num_gpus.
+    g_batch_gpu             = 16,        # Number of samples processed at a time by one GPU.
+    d_batch_gpu             = 16,        # Number of samples processed at a time by one GPU.
     ema_scheduler           = None,
     aug_scheduler           = None,
-    total_kimg              = 25000,    # Total length of the training, measured in thousands of real images.
-    kimg_per_tick           = 4,        # Progress snapshot interval.
-    image_snapshot_ticks    = 50,       # How often to save image snapshots? None = disable.
-    network_snapshot_ticks  = 50,       # How often to save network snapshots? None = disable.
+    total_kimg              = 50000,    # Total length of the training, measured in thousands of real images.
+    kimg_per_tick           = 5,        # Progress snapshot interval.
+    image_snapshot_ticks    = 10,       # How often to save image snapshots? None = disable.
+    network_snapshot_ticks  = 10,       # How often to save network snapshots? None = disable.
     resume_pkl              = None,     # Network pickle to resume training from.
     cudnn_benchmark         = True,     # Enable torch.backends.cudnn.benchmark?
     abort_fn                = None,     # Callback function for determining whether to abort training. Must return consistent results across ranks.
