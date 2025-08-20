@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
 
-def compute_psnr_enhanced(opts_hr, opts_lr, max_real=None, num_gen=50000):
+def compute_psnr_enhanced(opts_hr, opts_lr, max_real=None, num_gen=5000):
     """
     Enhanced PSNR computation for separate LR and HR datasets.
     
@@ -24,8 +24,8 @@ def compute_psnr_enhanced(opts_hr, opts_lr, max_real=None, num_gen=50000):
     G = copy.deepcopy(opts_lr.G).eval().requires_grad_(False).to(opts_lr.device)
     
     # Build datasets
-    lr_dataset = dnnlib.util.construct_class_by_name(**opts_lr.dataset_kwargs)
-    hr_dataset = dnnlib.util.construct_class_by_name(**opts_hr.dataset_kwargs)
+    lr_dataset = dnnlib.util.construct_class_by_name(**opts_lr.G_dataset_kwargs)
+    hr_dataset = dnnlib.util.construct_class_by_name(**opts_hr.D_dataset_kwargs)
     
     # Determine how many images to process
     dataset_length = min(len(lr_dataset), len(hr_dataset))
@@ -132,20 +132,20 @@ def normalize_images(images):
         images = (images + 1) * 127.5
     elif images.max() <= 1.0:
         # Assume [0, 1] range  
-        images = images * 255.0
-    # Otherwise assume already in [0, 255] range
+        images = images * 256.0
+    # Otherwise assume already in [0, 256] range
     
-    return torch.clamp(images, 0, 255)
+    return torch.clamp(images, 0, 256)
 
 
-def calculate_psnr_batch(img1, img2, max_val=255.0):
+def calculate_psnr_batch(img1, img2, max_val=256.0):
     """
     Calculate PSNR for a batch of images.
     
     Args:
         img1: Generated images tensor [N, C, H, W]
         img2: Ground truth images tensor [N, C, H, W]  
-        max_val: Maximum pixel value (default 255.0)
+        max_val: Maximum pixel value (default 256.0)
     
     Returns:
         list: PSNR values for each image in the batch
