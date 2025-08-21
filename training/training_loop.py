@@ -136,15 +136,15 @@ def training_loop(
     random_seed             = 0,        # Global random seed.
     num_gpus                = 1,        # Number of GPUs participating in the training.
     rank                    = 0,        # Rank of the current process in [0, num_gpus[.
-    batch_size              = 4,        # Total batch size for one training iteration. Can be larger than batch_gpu * num_gpus.
-    g_batch_gpu             = 4,        # Number of samples processed at a time by one GPU.
-    d_batch_gpu             = 4,        # Number of samples processed at a time by one GPU.
+    batch_size              = 16,        # Total batch size for one training iteration. Can be larger than batch_gpu * num_gpus.
+    g_batch_gpu             = 16,        # Number of samples processed at a time by one GPU.
+    d_batch_gpu             = 16,        # Number of samples processed at a time by one GPU.
     ema_scheduler           = None,
     aug_scheduler           = None,
     total_kimg              = 25000,    # Total length of the training, measured in thousands of real images.
     kimg_per_tick           = 4,        # Progress snapshot interval.
-    image_snapshot_ticks    = 1,       # How often to save image snapshots? None = disable.
-    network_snapshot_ticks  = 1,       # How often to save network snapshots? None = disable.
+    image_snapshot_ticks    = 50,       # How often to save image snapshots? None = disable.
+    network_snapshot_ticks  = 50,       # How often to save network snapshots? None = disable.
     resume_pkl              = None,     # Network pickle to resume training from.
     cudnn_benchmark         = True,     # Enable torch.backends.cudnn.benchmark?
     abort_fn                = None,     # Callback function for determining whether to abort training. Must return consistent results across ranks.
@@ -420,9 +420,9 @@ def training_loop(
         if (not done) and (cur_tick != 0) and (cur_nimg < tick_start_nimg + kimg_per_tick * 1000):
             continue
 
-        iters_per_tick = int(kimg_per_tick * 1000 / batch_size)
-        if rank == 0:
-            print(f"iters_per_tick: {iters_per_tick}")
+        # iters_per_tick = int(kimg_per_tick * 1000 / batch_size)
+        # if rank == 0:
+        #     print(f"iters_per_tick: {iters_per_tick}")
 
         # Print status line, accumulating the same information in training_stats.
         tick_end_time = time.time()
