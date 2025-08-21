@@ -149,7 +149,7 @@ def training_loop(
     cudnn_benchmark         = True,     # Enable torch.backends.cudnn.benchmark?
     abort_fn                = None,     # Callback function for determining whether to abort training. Must return consistent results across ranks.
     progress_fn             = None,     # Callback function for updating training progress. Called for all ranks.
-    metric_eval_ticks       = 100,      # How often to evaluate metrics? None = disable.      
+    metric_eval_ticks       = 200,      # How often to evaluate metrics? None = disable.      
 ):
     # Initialize.
     start_time = time.time()
