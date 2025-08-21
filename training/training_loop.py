@@ -141,7 +141,7 @@ def training_loop(
     d_batch_gpu             = 16,        # Number of samples processed at a time by one GPU.
     ema_scheduler           = None,
     aug_scheduler           = None,
-    total_kimg              = 25000,    # Total length of the training, measured in thousands of real images.
+    total_kimg              = 5000,    # Total length of the training, measured in thousands of real images.
     kimg_per_tick           = 4,        # Progress snapshot interval.
     image_snapshot_ticks    = 50,       # How often to save image snapshots? None = disable.
     network_snapshot_ticks  = 50,       # How often to save network snapshots? None = disable.
