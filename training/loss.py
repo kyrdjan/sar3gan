@@ -27,7 +27,7 @@ class R3GANLoss:
         # G
         if phase == 'G':
             
-            print(">>in phase G (loss)")
+            #  print(">>in phase G (loss)")
 
             AdversarialLoss, RelativisticLogits = self.trainer.AccumulateGeneratorGradients(gen_z, real_img, real_c, gain, self.preprocessor)
             
@@ -38,7 +38,7 @@ class R3GANLoss:
         # D
         if phase == 'D':
 
-            print(">>in phase D (loss)")
+            #  print(">>in phase D (loss)")
             AdversarialLoss, RelativisticLogits, R1Penalty, R2Penalty = self.trainer.AccumulateDiscriminatorGradients(gen_z, real_img, real_c, gamma, gain, self.preprocessor)
             
             training_stats.report('Loss/scores/real', RelativisticLogits)
