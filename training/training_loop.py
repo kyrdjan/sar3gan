@@ -115,7 +115,7 @@ def remap_optimizer_state_dict(state_dict, device):
 
 #----------------------------------------------------------------------------
 
-#TODO: TEST
+#TODO: CONNECT WITH G AND D's DATASET
 def training_loop(
     run_dir                 = '.',      # Output directory.
     G_training_set_kwargs   = {},       # Options for G training set.
@@ -136,15 +136,15 @@ def training_loop(
     random_seed             = 0,        # Global random seed.
     num_gpus                = 1,        # Number of GPUs participating in the training.
     rank                    = 0,        # Rank of the current process in [0, num_gpus[.
-    batch_size              = 16,        # Total batch size for one training iteration. Can be larger than batch_gpu * num_gpus.
-    g_batch_gpu             = 16,        # Number of samples processed at a time by one GPU.
-    d_batch_gpu             = 16,        # Number of samples processed at a time by one GPU.
+    batch_size              = 4,        # Total batch size for one training iteration. Can be larger than batch_gpu * num_gpus.
+    g_batch_gpu             = 4,        # Number of samples processed at a time by one GPU.
+    d_batch_gpu             = 4,        # Number of samples processed at a time by one GPU.
     ema_scheduler           = None,
     aug_scheduler           = None,
-    total_kimg              = 50000,    # Total length of the training, measured in thousands of real images.
-    kimg_per_tick           = 5,        # Progress snapshot interval.
-    image_snapshot_ticks    = 10,       # How often to save image snapshots? None = disable.
-    network_snapshot_ticks  = 10,       # How often to save network snapshots? None = disable.
+    total_kimg              = 25000,    # Total length of the training, measured in thousands of real images.
+    kimg_per_tick           = 4,        # Progress snapshot interval.
+    image_snapshot_ticks    = 1,       # How often to save image snapshots? None = disable.
+    network_snapshot_ticks  = 1,       # How often to save network snapshots? None = disable.
     resume_pkl              = None,     # Network pickle to resume training from.
     cudnn_benchmark         = True,     # Enable torch.backends.cudnn.benchmark?
     abort_fn                = None,     # Callback function for determining whether to abort training. Must return consistent results across ranks.
@@ -362,9 +362,23 @@ def training_loop(
             phase.opt.zero_grad(set_to_none=True)
             phase.module.requires_grad_(True)
 
-            # AccumulateDiscriminatorGradients(gen_z, real_img, real_c, gamma, gain, self.preprocessor)
-            for lr, hr, c in zip(lr_img, hr_img, label):
-                loss.accumulate_gradients(phase=phase.name, real_img=hr, real_c=c, gen_z=lr, gamma=cur_gamma,gain=num_gpus * phase.batch_gpu / batch_size)
+            # AccumulateDiscriminatorGradients(gen_z, real_img, real_c, gamma, gain, self.preprocessor) # old
+            # for lr, hr, c in zip(lr_img, hr_img, label):
+
+            start_time = time.time()
+
+            for lr, hr, c in zip(lr_img, hr_img, label): # NEW
+                loss.accumulate_gradients(
+                    phase=phase.name,
+                    real_img=hr,
+                    real_c=c,
+                    gen_z=lr,
+                    gamma=cur_gamma,
+                    gain=num_gpus * phase.batch_gpu / batch_size
+                )
+
+            end_time = time.time()
+            print(f"[DEBUG] Loop over {len(label)} items took {end_time - start_time:.4f} seconds")
 
             phase.module.requires_grad_(False)
 
@@ -398,10 +412,18 @@ def training_loop(
         cur_nimg += batch_size
         batch_idx += 1
 
+        # --- Add this snippet ---
+        if batch_idx % 50 == 0 and rank == 0:
+            print(f"iter {batch_idx}, kimg={cur_nimg/1e3:.2f}")
+
         # Perform maintenance tasks once per tick.
         done = (cur_nimg >= total_kimg * 1000)
         if (not done) and (cur_tick != 0) and (cur_nimg < tick_start_nimg + kimg_per_tick * 1000):
             continue
+
+        iters_per_tick = int(kimg_per_tick * 1000 / batch_size)
+        if rank == 0:
+            print(f"iters_per_tick: {iters_per_tick}")
 
         # Print status line, accumulating the same information in training_stats.
         tick_end_time = time.time()

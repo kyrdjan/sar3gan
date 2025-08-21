@@ -282,13 +282,12 @@ def compute_feature_stats_for_generator(
         opts, detector_url, detector_kwargs, rel_lo=0, rel_hi=1,
         batch_size=64, data_loader_kwargs=None, **stats_kwargs):
 
+    # Dataset for generator inputs (LR images)
     dataset = dnnlib.util.construct_class_by_name(**opts.G_dataset_kwargs)
     if data_loader_kwargs is None:
         data_loader_kwargs = dict(pin_memory=True, num_workers=3, prefetch_factor=2)
 
-    # ✅ Put G on correct device
-    G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
-
+    # Initialize statistics and progress
     stats = FeatureStats(**stats_kwargs)
     assert stats.max_items is not None
     progress = opts.progress.sub(
@@ -298,25 +297,39 @@ def compute_feature_stats_for_generator(
         rel_hi=rel_hi
     )
 
+    # Load generator
+    G = copy.deepcopy(opts.G).eval().requires_grad_(False).to(opts.device)
+
+    # Load detector
     detector = get_feature_detector(
         url=detector_url, device=opts.device,
         num_gpus=opts.num_gpus, rank=opts.rank,
         verbose=progress.verbose
     )
 
-    for images_lr, _labels in torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size, **data_loader_kwargs):
+    # Main loop
+    for step, (images_lr, _labels) in enumerate(
+            torch.utils.data.DataLoader(dataset=dataset, batch_size=batch_size, **data_loader_kwargs), 1):
         if stats.is_full():
             break
 
+        print(f"\n[Step {step}] Loading LR images...")
         images_lr = images_lr.to(opts.device)
-        images_hr = G(images_lr)  # ✅ now on GPU
+
+        print(f"[Step {step}] Running generator...")
+        images_hr = G(images_lr)
         images_hr = (images_hr * 127.5 + 128).clamp(0, 255).to(torch.uint8)
 
-        if images_hr.shape[1] == 1:
+        if images_hr.shape[1] == 1:  # grayscale → RGB
             images_hr = images_hr.repeat([1, 3, 1, 1])
 
+        print(f"[Step {step}] Extracting features with detector...")
         features = detector(images_hr, **detector_kwargs)
+
+        print(f"[Step {step}] Appending features to stats buffer...")
         stats.append_torch(features, num_gpus=opts.num_gpus, rank=opts.rank)
+
         progress.update(stats.num_items)
+        print(f"[Step {step}] Done. Processed {stats.num_items}/{stats.max_items} items.")
 
     return stats
