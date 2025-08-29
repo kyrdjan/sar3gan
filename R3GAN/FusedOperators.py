@@ -52,28 +52,28 @@ class BiasedActivationReference(nn.Module):
 class BiasedActivationCUDA(nn.Module):
     Gain = math.sqrt(2 / (1 + 0.2 ** 2))
     Function = 'lrelu'
+    MAX_ELEMS = 2**31 - 1  # CUDA kernel limit (~2.1B elements)
 
     def __init__(self, InputUnits):
         super().__init__()
         self.Bias = nn.Parameter(torch.zeros(InputUnits))
 
     def forward(self, x):
-        try:
-            return bias_act.bias_act(
-                x,
-                self.Bias.to(x.dtype),
-                act=BiasedActivationCUDA.Function,
-                gain=1
-            )
-        except RuntimeError as e:
-            print(f"[Warning] Falling back to PyTorch BiasedActivationReference due to: {e}")
-            # Fallback: just use reference version
-            y = x + self.Bias.to(x.dtype).view(1, -1, 1, 1) if x.ndim > 2 else x + self.Bias.to(x.dtype).view(1, -1)
-            return nn.functional.leaky_relu(y, negative_slope=0.2)
+        bias = self.Bias.to(x.dtype)
+        num_elems = x.numel()
+
+        if num_elems > self.MAX_ELEMS:
+            # 🚀 split into chunks to stay under CUDA limit, but still use fast kernel
+            chunks = torch.chunk(x, math.ceil(num_elems / self.MAX_ELEMS), dim=0)
+            outputs = []
+            for chunk in chunks:
+                outputs.append(bias_act.bias_act(chunk, bias, act=self.Function, gain=1))
+            return torch.cat(outputs, dim=0)
+
+        # Normal CUDA fast path
+        return bias_act.bias_act(x, bias, act=self.Function, gain=1)
 
 
-# Choose implementation
-# If you want to **force disable CUDA plugin**, just set:
-# BiasedActivation = BiasedActivationReference
-# Otherwise, keep CUDA and auto-fallback:
+# ✅ Choose implementation
+# Force PyTorch version (slower, safe):
 BiasedActivation = BiasedActivationCUDA
