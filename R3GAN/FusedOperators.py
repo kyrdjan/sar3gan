@@ -74,6 +74,6 @@ class BiasedActivationCUDA(nn.Module):
 
 # Choose implementation
 # If you want to **force disable CUDA plugin**, just set:
-# BiasedActivation = BiasedActivationReference
+BiasedActivation = BiasedActivationReference
 # Otherwise, keep CUDA and auto-fallback:
-BiasedActivation = BiasedActivationCUDA
+# BiasedActivation = BiasedActivationCUDA
