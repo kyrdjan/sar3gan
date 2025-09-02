@@ -157,10 +157,12 @@ def training_loop(
     np.random.seed(random_seed * num_gpus + rank)
     torch.manual_seed(random_seed * num_gpus + rank)
     torch.backends.cudnn.benchmark = cudnn_benchmark    # Improves training speed.
-    torch.backends.cuda.matmul.allow_tf32 = False       # Improves numerical accuracy.
-    torch.backends.cudnn.allow_tf32 = False             # Improves numerical accuracy.
+    torch.backends.cuda.matmul.allow_tf32 = True       # Improves numerical accuracy.(change to True)
+    torch.backends.cudnn.allow_tf32 = True             # Improves numerical accuracy.(change to True)
+    torch.backends.cudnn.deterministic = False          # Non deterministic convs for speed
     conv2d_gradfix.enabled = True                       # Improves training speed.
     grid_sample_gradfix.enabled = True                  # Avoids errors with the augmentation pipe.
+    
 
     # Load training set.
     if rank == 0:
@@ -340,8 +342,13 @@ def training_loop(
         with torch.autograd.profiler.record_function('data_fetch'):
             lr_img, label = next(G_training_set_iterator)
             hr_img, _ = next(D_training_set_iterator)
-            lr_img = (lr_img.to(device).to(torch.float32) / 127.5 - 1).split(g_batch_gpu)
-            hr_img = (hr_img.to(device).to(torch.float32) / 127.5 - 1).split(d_batch_gpu)
+            # Exceesive memory alloation and tensor operations 
+            # lr_img = (lr_img.to(device).to(torch.float32) / 127.5 - 1).split(g_batch_gpu)
+            # hr_img = (hr_img.to(device).to(torch.float32) / 127.5 - 1).split(d_batch_gpu)
+            # Pre normalize data in the dataset 
+            lr_img = lr_img.to(device, non_blocking=True).split(g_batch_gpu)
+            hr_img = hr_img.to(device, non_blocking=True).split(d_batch_gpu)
+            
             label = label.to(device).split(g_batch_gpu)
 
         # Update schedulers.
