@@ -166,7 +166,7 @@ def main(**kwargs):
     c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0], eps=1e-8)
     
     c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.R3GANLoss')
-    c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=4)#changed from 2 to 4
+    c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)#
 
     # Training set.
     c.G_training_set_kwargs, G_dataset_name = init_dataset_kwargs(data=opts.g_data)

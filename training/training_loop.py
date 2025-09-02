@@ -157,9 +157,9 @@ def training_loop(
     np.random.seed(random_seed * num_gpus + rank)
     torch.manual_seed(random_seed * num_gpus + rank)
     torch.backends.cudnn.benchmark = cudnn_benchmark    # Improves training speed.
-    torch.backends.cuda.matmul.allow_tf32 = True       # Improves numerical accuracy.(change to True)
-    torch.backends.cudnn.allow_tf32 = True             # Improves numerical accuracy.(change to True)
-    torch.backends.cudnn.deterministic = False          # Non deterministic convs for speed
+    torch.backends.cuda.matmul.allow_tf32 = False       # Improves numerical accuracy.(change to True)
+    torch.backends.cudnn.allow_tf32 = False              # Improves numerical accuracy.(change to True)
+    # torch.backends.cudnn.deterministic = False          # Non deterministic convs for speed
     conv2d_gradfix.enabled = True                       # Improves training speed.
     grid_sample_gradfix.enabled = True                  # Avoids errors with the augmentation pipe.
     
@@ -343,11 +343,11 @@ def training_loop(
             lr_img, label = next(G_training_set_iterator)
             hr_img, _ = next(D_training_set_iterator)
             # Exceesive memory alloation and tensor operations 
-            # lr_img = (lr_img.to(device).to(torch.float32) / 127.5 - 1).split(g_batch_gpu)
-            # hr_img = (hr_img.to(device).to(torch.float32) / 127.5 - 1).split(d_batch_gpu)
-            # Pre normalize data in the dataset 
-            lr_img = lr_img.to(device, non_blocking=True).split(g_batch_gpu)
-            hr_img = hr_img.to(device, non_blocking=True).split(d_batch_gpu)
+            lr_img = (lr_img.to(device).to(torch.float32) / 127.5 - 1).split(g_batch_gpu)
+            hr_img = (hr_img.to(device).to(torch.float32) / 127.5 - 1).split(d_batch_gpu)
+            # # Pre normalize data in the dataset 
+            # lr_img = lr_img.to(device, non_blocking=True).split(g_batch_gpu)
+            # hr_img = hr_img.to(device, non_blocking=True).split(d_batch_gpu)
             
             label = label.to(device).split(g_batch_gpu)
 
@@ -561,18 +561,18 @@ def training_loop(
                     stats_metrics.update({f"{metric}_in_domain": result_dict.results})
 
                 # (B) Cross-domain Validation
-                for metric in metrics:
-                    result_dict = metric_main.calc_metric(
-                        metric=metric, 
-                        G=snapshot_cross_domain['G_ema'],
-                        G_dataset_kwargs =  VG_training_set_kwargs,
-                        D_dataset_kwargs =  VD_training_set_kwargs, 
-                        num_gpus=num_gpus, rank=rank, device=device
-                    )
+                # for metric in metrics:
+                #     result_dict = metric_main.calc_metric(
+                #         metric=metric, 
+                #         G=snapshot_cross_domain['G_ema'],
+                #         G_dataset_kwargs =  VG_training_set_kwargs,
+                #         D_dataset_kwargs =  VD_training_set_kwargs, 
+                #         num_gpus=num_gpus, rank=rank, device=device
+                #     )
 
-                    if rank == 0:
-                        metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
-                    stats_metrics.update({f"{metric}_cross_domain": result_dict.results})
+                #     if rank == 0:
+                #         metric_main.report_metric(result_dict, run_dir=run_dir, snapshot_pkl=snapshot_pkl)
+                #     stats_metrics.update({f"{metric}_cross_domain": result_dict.results})
 
         # Cleanup
         del snapshot_in_domain, snapshot_cross_domain
