@@ -150,7 +150,7 @@ def psnr_en(opts):
     opts_lr.G_dataset_kwargs.update(max_size=None, xflip=False)
     
     results = peak_signal_noise_ratio.compute_psnr_enhanced(
-        opts_hr, opts_lr, max_real=5000, num_gen=5000
+        opts_hr, opts_lr, max_real=10000, num_gen=10000
     )
     
     return {

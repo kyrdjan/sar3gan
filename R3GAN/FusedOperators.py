@@ -72,8 +72,8 @@ class BiasedActivationCUDA(nn.Module):
             return nn.functional.leaky_relu(y, negative_slope=0.2)
 
 
-# Choose implementation
-# If you want to **force disable CUDA plugin**, just set:
+# # Choose implementation
+# # If you want to **force disable CUDA plugin**, just set:
 BiasedActivation = BiasedActivationReference
-# Otherwise, keep CUDA and auto-fallback:
-# BiasedActivation = BiasedActivationCUDA
+# # Otherwise, keep CUDA and auto-fallback:
+# # BiasedActivation = BiasedActivationCUDA
