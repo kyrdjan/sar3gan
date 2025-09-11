@@ -175,78 +175,145 @@ class DiscriminativeBasis(nn.Module): # OLD
         return self.LinearLayer(x)
     
 
-class GeneratorStage(nn.Module):
-    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
+# class GeneratorStage(nn.Module): # old
+#     def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
+#         super(GeneratorStage, self).__init__()
+
+#         self.DataType = DataType
+
+#         # NEW
+#         if ResamplingFilter is None:
+#             TransitionLayer = GenerativeBasis(InputChannels, OutputChannels)
+#             self.Layers = nn.ModuleList([
+#                 TransitionLayer,
+#                 *[ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)],
+#                 SelfAttention(OutputChannels) # SELF ATTENTION IS HEEREEEEEEEEEEEEEEEEEEEEE -----------
+#             ])
+#         else:
+#             TransitionLayer = UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+#             self.Layers = nn.ModuleList([
+#                 TransitionLayer,
+#                 *[ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)]
+#             ])
+
+#         # OLD
+#         # TransitionLayer = GenerativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+#         # self.Layers = nn.ModuleList([TransitionLayer] + [ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)])
+  
+
+#     def forward(self, x):
+
+#         x = x.to(self.DataType)
+
+#         for Layer in self.Layers:
+#             x = Layer(x)
+
+#         return x
+
+class GeneratorStage(nn.Module): # new
+    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, 
+                 ExpansionFactor, KernelSize, VarianceScalingParameter, 
+                 ResamplingFilter=None, DataType=torch.float32):
         super(GeneratorStage, self).__init__()
 
         self.DataType = DataType
 
-        # NEW
         if ResamplingFilter is None:
             TransitionLayer = GenerativeBasis(InputChannels, OutputChannels)
-            self.Layers = nn.ModuleList([
-                TransitionLayer,
-                *[ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)],
-                SelfAttention(OutputChannels) # SELF ATTENTION IS HEEREEEEEEEEEEEEEEEEEEEEE -----------
-            ])
         else:
             TransitionLayer = UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
-            self.Layers = nn.ModuleList([
-                TransitionLayer,
-                *[ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)]
-            ])
 
-        # OLD
-        # TransitionLayer = GenerativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
-        # self.Layers = nn.ModuleList([TransitionLayer] + [ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)])
-  
+        self.Transition = TransitionLayer
+        self.Blocks = nn.ModuleList([
+            ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter)
+            for _ in range(NumberOfBlocks)
+        ])
+        self.Attention = SelfAttention(OutputChannels)  # keep defined, use only at 64x64
 
     def forward(self, x):
-
         x = x.to(self.DataType)
 
-        for Layer in self.Layers:
-            x = Layer(x)
+        x = self.Transition(x)
+        for block in self.Blocks:
+            x = block(x)
+
+        # apply self-attention only at 64×64
+        if x.shape[-1] == 64:
+            x = self.Attention(x)
 
         return x
 
     
-class DiscriminatorStage(nn.Module):
-    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
+# class DiscriminatorStage(nn.Module): # old
+#     def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
+#         super(DiscriminatorStage, self).__init__()
+        
+#         # NEW
+#         if ResamplingFilter is None:
+#             TransitionLayer = DiscriminativeBasis(InputChannels, OutputChannels)
+#             self.Layers = nn.ModuleList(
+#                 [SelfAttention(InputChannels)] +
+#                 [ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] +
+#                 [TransitionLayer]
+#             )
+#         else:
+#             TransitionLayer = DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+#             self.Layers = nn.ModuleList([
+#                 ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] 
+#                 + [TransitionLayer]
+#             )
+
+
+#         # OLD
+#         # TransitionLayer = DiscriminativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+#         # self.Layers = nn.ModuleList([ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] + [TransitionLayer])
+        
+        
+#         self.DataType = DataType
+        
+#     def forward(self, x):
+        
+#         x = x.to(self.DataType)
+        
+#         for Layer in self.Layers:
+#             x = Layer(x)
+        
+#         return x
+
+
+class DiscriminatorStage(nn.Module): # new
+    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, 
+                 ExpansionFactor, KernelSize, VarianceScalingParameter, 
+                 ResamplingFilter=None, DataType=torch.float32):
         super(DiscriminatorStage, self).__init__()
-        
-        # NEW
-        if ResamplingFilter is None:
-            TransitionLayer = DiscriminativeBasis(InputChannels, OutputChannels)
-            self.Layers = nn.ModuleList(
-                [SelfAttention(InputChannels)] +
-                [ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] +
-                [TransitionLayer]
-            )
-        else:
-            TransitionLayer = DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
-            self.Layers = nn.ModuleList([
-                ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] 
-                + [TransitionLayer]
-            )
 
-
-        # OLD
-        # TransitionLayer = DiscriminativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
-        # self.Layers = nn.ModuleList([ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)] + [TransitionLayer])
-        
-        
         self.DataType = DataType
-        
+
+        self.Blocks = nn.ModuleList([
+            ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter)
+            for _ in range(NumberOfBlocks)
+        ])
+        self.Attention = SelfAttention(InputChannels)  # conditional at 64x64
+
+        if ResamplingFilter is None:
+            self.Transition = DiscriminativeBasis(InputChannels, OutputChannels)
+        else:
+            self.Transition = DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+
     def forward(self, x):
-        
         x = x.to(self.DataType)
-        
-        for Layer in self.Layers:
-            x = Layer(x)
-        
+
+        for block in self.Blocks:
+            x = block(x)
+
+        # apply self-attention only at 64×64
+        if x.shape[-1] == 64:
+            x = self.Attention(x)
+
+        x = self.Transition(x)
         return x
-    
+
+
 class Generator(nn.Module):
     def __init__(self, WidthPerStage, CardinalityPerStage, BlocksPerStage, ExpansionFactor, ConditionDimension=None, ConditionEmbeddingDimension=3, KernelSize=3, ResamplingFilter=[1, 2, 1]):
         super(Generator, self).__init__()

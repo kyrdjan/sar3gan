@@ -111,7 +111,7 @@ def report_metric(result_dict, run_dir=None, snapshot_pkl=None):
 def ssim(opts):
     # Use HR dataset for ground-truth
     opts_hr = copy.deepcopy(opts)
-    opts_hr.dataset_kwargs = copy.deepcopy(getattr(opts, "D_dataset_kwargs", opts.dataset_kwargs))
+    opts_hr.dataset_kwargs = copy.deepcopy(opts.D_dataset_kwargs)
     opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
 
     mean_ssim, std_ssim = structural_similarity_index_measure.compute_ssim(
@@ -124,12 +124,12 @@ def ssim(opts):
 def fid_en(opts):
     # Real dataset (HR)
     opts_hr = copy.deepcopy(opts)
-    opts_hr.dataset_kwargs = copy.deepcopy(getattr(opts, "D_dataset_kwargs", opts.dataset_kwargs))
+    opts_hr.dataset_kwargs = copy.deepcopy(opts.D_dataset_kwargs)
     opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
 
     # Generator dataset (LR → HR outputs)
     opts_lr = copy.deepcopy(opts)
-    opts_lr.dataset_kwargs = copy.deepcopy(getattr(opts, "G_dataset_kwargs", opts.dataset_kwargs))
+    opts_lr.dataset_kwargs = copy.deepcopy(opts.G_dataset_kwargs)
     opts_lr.dataset_kwargs.update(max_size=None, xflip=False)
 
     fid = frechet_inception_distance.compute_fid_en(
@@ -142,12 +142,12 @@ def fid_en(opts):
 def psnr_en(opts):
     # Real dataset (HR)
     opts_hr = copy.deepcopy(opts)
-    opts_hr.dataset_kwargs = copy.deepcopy(getattr(opts, "D_dataset_kwargs", opts.dataset_kwargs))
+    opts_hr.dataset_kwargs = copy.deepcopy(opts.D_dataset_kwargs)
     opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
 
     # Generator dataset (LR → HR outputs)
     opts_lr = copy.deepcopy(opts)
-    opts_lr.dataset_kwargs = copy.deepcopy(getattr(opts, "G_dataset_kwargs", opts.dataset_kwargs))
+    opts_lr.dataset_kwargs = copy.deepcopy(opts.G_dataset_kwargs)
     opts_lr.dataset_kwargs.update(max_size=None, xflip=False)
 
     results = peak_signal_noise_ratio.compute_psnr_enhanced(
@@ -163,33 +163,32 @@ def psnr_en(opts):
         "psnr_perfect": results.get("num_perfect_matches", 0),
     }
 
-
     
 #----------------------------------------------------------------------------
 # Legacy metrics.
 
-@register_metric
-def fid50k(opts):
-    opts.dataset_kwargs.update(max_size=None)
-    fid = frechet_inception_distance.compute_fid(opts, max_real=50000, num_gen=50000)
-    return dict(fid50k=fid)
+# @register_metric
+# def fid50k(opts):
+#     opts.dataset_kwargs.update(max_size=None)
+#     fid = frechet_inception_distance.compute_fid(opts, max_real=50000, num_gen=50000)
+#     return dict(fid50k=fid)
 
-@register_metric
-def kid50k(opts):
-    opts.dataset_kwargs.update(max_size=None)
-    kid = kernel_inception_distance.compute_kid(opts, max_real=50000, num_gen=50000, num_subsets=100, max_subset_size=1000)
-    return dict(kid50k=kid)
+# @register_metric
+# def kid50k(opts):
+#     opts.dataset_kwargs.update(max_size=None)
+#     kid = kernel_inception_distance.compute_kid(opts, max_real=50000, num_gen=50000, num_subsets=100, max_subset_size=1000)
+#     return dict(kid50k=kid)
 
-@register_metric
-def pr50k3(opts):
-    opts.dataset_kwargs.update(max_size=None)
-    precision, recall = precision_recall.compute_pr(opts, max_real=50000, num_gen=50000, nhood_size=3, row_batch_size=10000, col_batch_size=10000)
-    return dict(pr50k3_precision=precision, pr50k3_recall=recall)
+# @register_metric
+# def pr50k3(opts):
+#     opts.dataset_kwargs.update(max_size=None)
+#     precision, recall = precision_recall.compute_pr(opts, max_real=50000, num_gen=50000, nhood_size=3, row_batch_size=10000, col_batch_size=10000)
+#     return dict(pr50k3_precision=precision, pr50k3_recall=recall)
 
-@register_metric
-def is50k(opts):
-    opts.dataset_kwargs.update(max_size=None, xflip=False)
-    mean, std = inception_score.compute_is(opts, num_gen=50000, num_splits=10)
-    return dict(is50k_mean=mean, is50k_std=std)
+# @register_metric
+# def is50k(opts):
+#     opts.dataset_kwargs.update(max_size=None, xflip=False)
+#     mean, std = inception_score.compute_is(opts, num_gen=50000, num_splits=10)
+#     return dict(is50k_mean=mean, is50k_std=std)
 
-#----------------------------------------------------------------------------
+# #----------------------------------------------------------------------------
