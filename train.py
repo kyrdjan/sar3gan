@@ -162,11 +162,13 @@ def main(**kwargs):
     
     c.G_kwargs = dnnlib.EasyDict(class_name='training.networks.Generator')
     c.D_kwargs = dnnlib.EasyDict(class_name='training.networks.Discriminator')
-    c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0], eps=1e-8)
-    c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0], eps=1e-8)
+    # Good default Adam betas for GANs: no momentum for first param, momentum for 2nd
+    c.G_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
+    c.D_opt_kwargs = dnnlib.EasyDict(class_name='torch.optim.Adam', betas=[0,0.99], eps=1e-8)
+
     
     c.loss_kwargs = dnnlib.EasyDict(class_name='training.loss.R3GANLoss')
-    c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)
+    c.data_loader_kwargs = dnnlib.EasyDict(pin_memory=True, prefetch_factor=2)#
 
     # Training set.
     c.G_training_set_kwargs, G_dataset_name = init_dataset_kwargs(data=opts.g_data)
@@ -174,8 +176,10 @@ def main(**kwargs):
     c.VG_training_set_kwargs, VG_dataset_name = init_dataset_kwargs(data=opts.vg_data)
     c.VD_training_set_kwargs, VD_dataset_name = init_dataset_kwargs(data=opts.vd_data)
 
-    if opts.cond and not c.training_set_kwargs.use_labels:
-        raise click.ClickException('--cond=True requires labels specified in dataset.json')
+    # require labels in datasets if conditional training was requested
+    if opts.cond and (not c.G_training_set_kwargs.use_labels or not c.D_training_set_kwargs.use_labels):
+        raise click.ClickException('--cond=True requires labels in both G and D datasets (dataset.json must have labels)')
+
     c.G_training_set_kwargs.use_labels = opts.cond
     c.G_training_set_kwargs.xflip = opts.mirror
     c.D_training_set_kwargs.use_labels = opts.cond
@@ -188,24 +192,48 @@ def main(**kwargs):
     c.d_batch_gpu = opts.d_batch_gpu or opts.batch // opts.gpus
 
     if opts.preset == 'TEST-256':
-        # Core architecture settings (256×256, no conditional)
-        WidthPerStage       = [256, 256, 256, 256, 256, 256, 256]  # 7 stages to reach 256×256
-        BlocksPerStage      = [2, 2, 2, 2, 2, 2, 2]                # 2 blocks per stage
-        CardinalityPerStage = [8, 8, 8, 8, 4, 4, 4]                # Grouped conv cardinalities
-        FP16Stages          = [-1, -2]                             # Use mixed precision for largest resolutions
+        # -----------------------------
+        # Core architecture (256×256)
+        # -----------------------------
+        WidthPerStage       = [256, 256, 256, 256, 128, 64, 32]   # lighter upper layers
+        BlocksPerStage      = [2, 2, 2, 2, 1, 1, 1]               # fewer blocks at high res
+        CardinalityPerStage = [8, 8, 8, 8, 4, 4, 4]               # grouped convs
+        FP16Stages          = [-1, -2, -3]                        # mixed precision in high res
 
-        # Training schedule (scaled for 10k dataset, ~100 epochs)
-        dataset_size = 10_000
-        target_epochs = 100
-
-        decay_nimg = dataset_size * target_epochs       # 1,000,000 images total
-        ema_nimg   = dataset_size * 5                   # 50,000 images (EMA ramp over ~5 epochs)
+        # -----------------------------
+        # Training schedule
+        # -----------------------------
+        dataset_size   = 10_000
+        target_epochs  = 30
+        decay_nimg     = dataset_size * target_epochs    # 300k images total
+        ema_nimg       = dataset_size * 3                # 30k images (~3 epochs for EMA warmup)
 
         c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
         c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.3,        'total_nimg': decay_nimg }
         c.lr_scheduler     = { 'base_value': 2e-4, 'final_value': 5e-5,       'total_nimg': decay_nimg }
         c.gamma_scheduler  = { 'base_value': 2.0,  'final_value': 0.2,        'total_nimg': decay_nimg }
         c.beta2_scheduler  = { 'base_value': 0.9,  'final_value': 0.99,       'total_nimg': decay_nimg }
+
+    # if opts.preset == 'TEST-256':
+    # # Core architecture settings (256×256, no conditional)
+    #     WidthPerStage       = [256, 256, 256, 256, 256, 256, 256]  
+    #     BlocksPerStage      = [2, 2, 2, 2, 2, 2, 2]                
+    #     CardinalityPerStage = [8, 8, 8, 8, 4, 4, 4]                
+    #     FP16Stages          = [-1, -2, -3]   # V100 has weaker FP16 than H100, so fewer FP16 stages
+
+    #     # Training schedule (scaled for 10k dataset, ~30 epochs)
+    #     dataset_size = 10_000
+    #     target_epochs = 30   
+
+    #     decay_nimg = dataset_size * target_epochs       # 300,000 images total (~300 kimg)
+    #     ema_nimg   = dataset_size * 2                   # 20,000 images (EMA ramps in ~2 epochs)
+
+    #     # Optimizer / schedulers
+    #     c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
+    #     c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.3,        'total_nimg': decay_nimg }
+    #     c.lr_scheduler     = { 'base_value': 2e-4, 'final_value': 5e-5,       'total_nimg': decay_nimg }
+    #     c.gamma_scheduler  = { 'base_value': 1.0,  'final_value': 0.1,        'total_nimg': decay_nimg }
+    #     c.beta2_scheduler  = { 'base_value': 0.5,  'final_value': 0.99,       'total_nimg': decay_nimg }
 
         # No conditional or noise dimension
         # Remove:
@@ -348,7 +376,7 @@ def main(**kwargs):
         c.cudnn_benchmark = False
 
     # Description string.
-    desc = f'training&validation-gpus{c.num_gpus:d}-batch{c.batch_size:d}'
+    desc = f'training-gpus{c.num_gpus:d}-batch{c.batch_size:d}'
     if opts.desc is not None:
         desc += f'-{opts.desc}'
 

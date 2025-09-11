@@ -313,23 +313,23 @@ def compute_feature_stats_for_generator(
         if stats.is_full():
             break
 
-        print(f"\n[Step {step}] Loading LR images...")
+        # print(f"\n[Step {step}] Loading LR images...")
         images_lr = images_lr.to(opts.device)
 
-        print(f"[Step {step}] Running generator...")
+        # print(f"[Step {step}] Running generator...")
         images_hr = G(images_lr)
         images_hr = (images_hr * 127.5 + 128).clamp(0, 255).to(torch.uint8)
 
         if images_hr.shape[1] == 1:  # grayscale → RGB
             images_hr = images_hr.repeat([1, 3, 1, 1])
 
-        print(f"[Step {step}] Extracting features with detector...")
+        # print(f"[Step {step}] Extracting features with detector...")
         features = detector(images_hr, **detector_kwargs)
 
-        print(f"[Step {step}] Appending features to stats buffer...")
+        # print(f"[Step {step}] Appending features to stats buffer...")
         stats.append_torch(features, num_gpus=opts.num_gpus, rank=opts.rank)
 
         progress.update(stats.num_items)
-        print(f"[Step {step}] Done. Processed {stats.num_items}/{stats.max_items} items.")
+        #  print(f"[Step {step}] Done. Processed {stats.num_items}/{stats.max_items} items.")
 
     return stats

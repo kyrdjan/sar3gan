@@ -109,57 +109,58 @@ def report_metric(result_dict, run_dir=None, snapshot_pkl=None):
 # ---------------------------------------------------------------------------
 @register_metric
 def ssim(opts):
+    # Use HR dataset for ground-truth
     opts_hr = copy.deepcopy(opts)
-    opts_hr.D_dataset_kwargs.update(max_size=None)
-    mean_ssim, std_ssim = structural_similarity_index_measure.compute_ssim(opts, num_gen=10000, max_real=10000)
-    return dict(ssim50k_mean=mean_ssim, ssim50k_std=std_ssim)
+    opts_hr.dataset_kwargs = copy.deepcopy(getattr(opts, "D_dataset_kwargs", opts.dataset_kwargs))
+    opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
+
+    mean_ssim, std_ssim = structural_similarity_index_measure.compute_ssim(
+        opts_hr, num_gen=10000, max_real=10000
+    )
+    return dict(ssim10k_mean=mean_ssim, ssim10k_std=std_ssim)
 
 
 @register_metric
 def fid_en(opts):
     # Real dataset (HR)
     opts_hr = copy.deepcopy(opts)
-    opts_hr.dataset_kwargs = copy.deepcopy(opts.D_dataset_kwargs)
+    opts_hr.dataset_kwargs = copy.deepcopy(getattr(opts, "D_dataset_kwargs", opts.dataset_kwargs))
     opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
 
-    # Generator dataset (LR)
+    # Generator dataset (LR → HR outputs)
     opts_lr = copy.deepcopy(opts)
-    opts_lr.dataset_kwargs = copy.deepcopy(opts.G_dataset_kwargs)
+    opts_lr.dataset_kwargs = copy.deepcopy(getattr(opts, "G_dataset_kwargs", opts.dataset_kwargs))
     opts_lr.dataset_kwargs.update(max_size=None, xflip=False)
 
     fid = frechet_inception_distance.compute_fid_en(
         opts_hr, opts_lr, max_real=10000, num_gen=10000
     )
-    return dict(fid50k_en=fid)
+    return dict(fid10k_en=fid)
+
 
 @register_metric
 def psnr_en(opts):
-    """Enhanced PSNR metric for separate LR-HR datasets."""
-    import copy
-    
-    # Create HR options (for ground truth images)
+    # Real dataset (HR)
     opts_hr = copy.deepcopy(opts)
-    if hasattr(opts, 'D_dataset_kwargs'):
-        opts_hr.D_dataset_kwargs = opts.D_dataset_kwargs
-    opts_hr.D_dataset_kwargs.update(max_size=None, xflip=False)
-    
-    # Create LR options (for generator inputs)
-    opts_lr = copy.deepcopy(opts)  
-    if hasattr(opts, 'G_dataset_kwargs'):
-        opts_lr.G_dataset_kwargs = opts.G_dataset_kwargs
-    opts_lr.G_dataset_kwargs.update(max_size=None, xflip=False)
-    
+    opts_hr.dataset_kwargs = copy.deepcopy(getattr(opts, "D_dataset_kwargs", opts.dataset_kwargs))
+    opts_hr.dataset_kwargs.update(max_size=None, xflip=False)
+
+    # Generator dataset (LR → HR outputs)
+    opts_lr = copy.deepcopy(opts)
+    opts_lr.dataset_kwargs = copy.deepcopy(getattr(opts, "G_dataset_kwargs", opts.dataset_kwargs))
+    opts_lr.dataset_kwargs.update(max_size=None, xflip=False)
+
     results = peak_signal_noise_ratio.compute_psnr_enhanced(
-        opts_hr, opts_lr, max_real=5000, num_gen=5000
+        opts_hr, opts_lr, max_real=10000, num_gen=10000
     )
-    
+
     return {
-        'psnr_mean': results['psnr_mean'],
-        'psnr_std': results['psnr_std'],
-        'psnr_median': results['psnr_median'],
-        'psnr_min': results['psnr_min'], 
-        'psnr_max': results['psnr_max'],
-        'psnr_perfect': results['num_perfect_matches']
+        "psnr_mean": results.get("psnr_mean", 0.0),
+        "psnr_std": results.get("psnr_std", 0.0),
+        "psnr_median": results.get("psnr_median", 0.0),
+        "psnr_min": results.get("psnr_min", 0.0),
+        "psnr_max": results.get("psnr_max", 0.0),
+        "psnr_perfect": results.get("num_perfect_matches", 0),
     }
 
 
