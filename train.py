@@ -147,7 +147,7 @@ def parse_comma_separated_list(s):
 # Misc settings.
 @click.option('--desc',         help='String to include in result dir name', metavar='STR',     type=str)
 @click.option('--metrics',      help='Quality metrics', metavar='[NAME|A,B,C|none]',            type=parse_comma_separated_list, default='fid50k_full', show_default=True)
-@click.option('--kimg',         help='Total training duration', metavar='KIMG',                 type=click.IntRange(min=1), default=10000000, show_default=True)
+@click.option('--kimg',         help='Total training duration', metavar='KIMG',                 type=click.IntRange(min=1), default=1, show_default=True)
 @click.option('--tick',         help='How often to print progress', metavar='KIMG',             type=click.IntRange(min=1), default=4, show_default=True)
 @click.option('--snap',         help='How often to save snapshots', metavar='TICKS',            type=click.IntRange(min=1), default=50, show_default=True)
 @click.option('--seed',         help='Random seed', metavar='INT',                              type=click.IntRange(min=0), default=0, show_default=True)
@@ -193,26 +193,30 @@ def main(**kwargs):
 
     if opts.preset == 'TEST-256':
         # -----------------------------
-        # Core architecture (256×256)
+        # Core architecture (64→128→256)
         # -----------------------------
-        WidthPerStage       = [256, 256, 256, 256, 128, 64, 32]   # lighter upper layers
-        BlocksPerStage      = [2, 2, 2, 2, 1, 1, 1]               # fewer blocks at high res
-        CardinalityPerStage = [8, 8, 8, 8, 4, 4, 4]               # grouped convs
-        FP16Stages          = [-1, -2, -3]                        # mixed precision in high res
+        WidthPerStage       = [64, 128, 256]    # feature widths per stage
+        BlocksPerStage      = [2, 2, 2]         # number of conv/residual blocks per stage
+        CardinalityPerStage = [8, 8, 8]         # grouped convolutions per stage
+        FP16Stages          = [-1, -2]          # enable FP16 at higher res if desired
 
         # -----------------------------
         # Training schedule
         # -----------------------------
         dataset_size   = 10_000
-        target_epochs  = 30
-        decay_nimg     = dataset_size * target_epochs    # 300k images total
-        ema_nimg       = dataset_size * 3                # 30k images (~3 epochs for EMA warmup)
+        target_epochs  = 50                         # train longer for convergence
+        decay_nimg     = dataset_size * target_epochs    # 500k images
+        ema_nimg       = dataset_size * 3                # 30k images (~3 epochs)
 
         c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
-        c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.1,        'total_nimg': decay_nimg }
-        c.lr_scheduler     = { 'base_value': 2e-4, 'final_value': 5e-5,       'total_nimg': decay_nimg }
-        c.gamma_scheduler  = { 'base_value': 2.0,  'final_value': 0.2,        'total_nimg': decay_nimg }
+        c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.2,        'total_nimg': decay_nimg }
+        c.lr_scheduler     = { 'base_value': 1e-4, 'final_value': 2e-5,       'total_nimg': decay_nimg }
+        c.gamma_scheduler  = { 'base_value': 10.0, 'final_value': 1.0,        'total_nimg': decay_nimg }
         c.beta2_scheduler  = { 'base_value': 0.9,  'final_value': 0.99,       'total_nimg': decay_nimg }
+
+        c.total_kimg = decay_nimg // 1000
+
+
 
     # if opts.preset == 'TEST-256':
     # # Core architecture settings (256×256, no conditional)
