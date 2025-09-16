@@ -241,8 +241,8 @@ class GeneratorStage(nn.Module):
             x = block(x)
 
         # # Conditional attention at 64x64 # 1st traning
-        # if x.shape[-1] == 64:
-        #     x = self.Attention(x)
+        if x.shape[-1] == 64:
+            x = self.Attention(x)
 
         return x
 
@@ -303,6 +303,9 @@ class DiscriminatorStage(nn.Module):
         x = x.to(self.DataType)
         for block in self.Blocks:
             x = block(x)
+
+        if x.shape[-1] == 64: # 1st training
+            x = self.Attention(x)
 
         if isinstance(self.Transition, nn.AdaptiveAvgPool2d):
             x = self.Transition(x)       # [B, C, 1, 1]
