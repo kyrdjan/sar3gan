@@ -210,38 +210,42 @@ class DiscriminativeBasis(nn.Module): # OLD
 
 #         return x
 
-class GeneratorStage(nn.Module): # new
-    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, 
-                 ExpansionFactor, KernelSize, VarianceScalingParameter, 
-                 ResamplingFilter=None, DataType=torch.float32):
-        super(GeneratorStage, self).__init__()
-
+class GeneratorStage(nn.Module):
+    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
+        super().__init__()
         self.DataType = DataType
 
-        if ResamplingFilter is None:
-            TransitionLayer = GenerativeBasis(InputChannels, OutputChannels)
-        else:
-            TransitionLayer = UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+        # Transition layer
+        self.Transition = GenerativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
 
-        self.Transition = TransitionLayer
+        # Residual blocks
         self.Blocks = nn.ModuleList([
             ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter)
             for _ in range(NumberOfBlocks)
         ])
-        self.Attention = SelfAttention(OutputChannels)  # keep defined, use only at 64x64
+
+        # Self-attention always defined; applied conditionally in forward
+        self.Attention = SelfAttention(OutputChannels)
 
     def forward(self, x):
         x = x.to(self.DataType)
 
+        # Apply transition
         x = self.Transition(x)
-        for block in self.Blocks:
+
+        # Residual blocks
+        for block in self.Blocks:            
+        # Conditional attention at 64x64
+            # if x.shape[-1] == 64: # 2nd training
+            #     x = self.Attention(x)
             x = block(x)
 
-        # apply self-attention only at 64×64
-        if x.shape[-1] == 64:
-            x = self.Attention(x)
+        # # Conditional attention at 64x64 # 1st traning
+        # if x.shape[-1] == 64:
+        #     x = self.Attention(x)
 
         return x
+
 
     
 # class DiscriminatorStage(nn.Module): # old
@@ -281,35 +285,22 @@ class GeneratorStage(nn.Module): # new
 #         return x
 
 
-class DiscriminatorStage(nn.Module): # new
-    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, 
-                 ExpansionFactor, KernelSize, VarianceScalingParameter, 
-                 ResamplingFilter=None, DataType=torch.float32):
-        super(DiscriminatorStage, self).__init__()
-
+class DiscriminatorStage(nn.Module):
+    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
+        super().__init__()
         self.DataType = DataType
-
-        self.Blocks = nn.ModuleList([
-            ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter)
-            for _ in range(NumberOfBlocks)
-        ])
-        self.Attention = SelfAttention(InputChannels)  # conditional at 64x64
-
-        if ResamplingFilter is None:
-            self.Transition = DiscriminativeBasis(InputChannels, OutputChannels)
-        else:
-            self.Transition = DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+        self.Blocks = nn.ModuleList([ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)])
+        self.Attention = SelfAttention(InputChannels)
+        self.Transition = DiscriminativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
 
     def forward(self, x):
         x = x.to(self.DataType)
-
         for block in self.Blocks:
+            # if x.shape[-1] == 64: # 2nd training
+            #     x = self.Attention(x)
             x = block(x)
-
-        # apply self-attention only at 64×64
-        if x.shape[-1] == 64:
-            x = self.Attention(x)
-
+        # if x.shape[-1] == 64: # 1st training
+        #     x = self.Attention(x)
         x = self.Transition(x)
         return x
 
