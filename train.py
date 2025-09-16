@@ -128,8 +128,8 @@ def parse_comma_separated_list(s):
 @click.option('--outdir',       help='Where to save the results', metavar='DIR',                required=True)
 @click.option('--g-data',       help='Generator Training data', metavar='[ZIP|DIR]',            type=str, required=True)
 @click.option('--d-data',       help='Discriminator Training data', metavar='[ZIP|DIR]',        type=str, required=True)
-@click.option('--vg-data',       help='Cross Dataset Validation G data', metavar='[ZIP|DIR]',   type=str, required=True)
-@click.option('--vd-data',       help='Cross Dataset Validation D data', metavar='[ZIP|DIR]',   type=str, required=True)
+@click.option('--vg-data',      help='Cross Dataset Validation G data', metavar='[ZIP|DIR]',   type=str, required=False)
+@click.option('--vd-data',      help='Cross Dataset Validation D data', metavar='[ZIP|DIR]',   type=str, required=False )
 @click.option('--gpus',         help='Number of GPUs to use', metavar='INT',                    type=click.IntRange(min=1), required=True)
 @click.option('--batch',        help='Total batch size', metavar='INT',                         type=click.IntRange(min=1), required=True)
 @click.option('--preset',       help='Preset configs', metavar='STR',                           type=str, required=True)
@@ -173,8 +173,8 @@ def main(**kwargs):
     # Training set.
     c.G_training_set_kwargs, G_dataset_name = init_dataset_kwargs(data=opts.g_data)
     c.D_training_set_kwargs, D_dataset_name = init_dataset_kwargs(data=opts.d_data)
-    c.VG_training_set_kwargs, VG_dataset_name = init_dataset_kwargs(data=opts.vg_data)
-    c.VD_training_set_kwargs, VD_dataset_name = init_dataset_kwargs(data=opts.vd_data)
+    # c.VG_training_set_kwargs, VG_dataset_name = init_dataset_kwargs(data=opts.vg_data)
+    # c.VD_training_set_kwargs, VD_dataset_name = init_dataset_kwargs(data=opts.vd_data)
 
     # require labels in datasets if conditional training was requested
     if opts.cond and (not c.G_training_set_kwargs.use_labels or not c.D_training_set_kwargs.use_labels):
@@ -209,7 +209,7 @@ def main(**kwargs):
         ema_nimg       = dataset_size * 3                # 30k images (~3 epochs for EMA warmup)
 
         c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
-        c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.3,        'total_nimg': decay_nimg }
+        c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.1,        'total_nimg': decay_nimg }
         c.lr_scheduler     = { 'base_value': 2e-4, 'final_value': 5e-5,       'total_nimg': decay_nimg }
         c.gamma_scheduler  = { 'base_value': 2.0,  'final_value': 0.2,        'total_nimg': decay_nimg }
         c.beta2_scheduler  = { 'base_value': 0.9,  'final_value': 0.99,       'total_nimg': decay_nimg }
@@ -241,7 +241,7 @@ def main(**kwargs):
         # c.D_kwargs.ConditionEmbeddingDimension
         # NoiseDimension
 
-    {
+    
     # if opts.preset == 'CIFAR10':
     #     WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024]]
     #     BlocksPerStage = [2 * x for x in [1, 1, 1, 1]]
@@ -278,21 +278,21 @@ def main(**kwargs):
     #     c.gamma_scheduler = { 'base_value': 2, 'final_value': 0.2, 'total_nimg': decay_nimg }
     #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
-    # if opts.preset == 'FFHQ-256':
-    #     WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024, 512, 256, 128]]
-    #     BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1, 1, 1]]
-    #     CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 16, 8, 4]]
-    #     FP16Stages = [-1, -2, -3, -4]
-    #     NoiseDimension = 64
+    if opts.preset == 'FFHQ-256':
+        WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024, 512, 256, 128]]
+        BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1, 1, 1]]
+        CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 16, 8, 4]]
+        FP16Stages = [-1, -2, -3, -4]
+        # NoiseDimension = 64
        
-    #     ema_nimg = 500 * 1000
-    #     decay_nimg = 2e7
+        ema_nimg = 500 * 1000
+        decay_nimg = 2e7
        
-    #     c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
-    #     c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
-    #     c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
-    #     c.gamma_scheduler = { 'base_value': 150, 'final_value': 15, 'total_nimg': decay_nimg }
-    #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
+        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
+        c.gamma_scheduler = { 'base_value': 150, 'final_value': 15, 'total_nimg': decay_nimg }
+        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
     # if opts.preset == 'ImageNet-32':
     #     WidthPerStage = [6 * x // 4 for x in [1024, 1024, 1024, 1024]]
@@ -333,7 +333,7 @@ def main(**kwargs):
     #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
     # c.G_kwargs.NoiseDimension = NoiseDimension   
-    }
+    
     c.G_kwargs.WidthPerStage = WidthPerStage
     c.G_kwargs.CardinalityPerStage = CardinalityPerStage
     c.G_kwargs.BlocksPerStage = BlocksPerStage
