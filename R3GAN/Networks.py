@@ -132,51 +132,48 @@ class DownsampleLayer(nn.Module):
 #         feat = self.Project(x).view(x.shape[0], -1)  # [N, 64]
 #         out = self.LinearLayer(feat).view(x.shape[0], -1, 1, 1)
 #         return self.Basis.view(1, -1, 4, 4) * out
-class GenerativeBasis(nn.Module):  # NEW v2 (fixed for 64x64)
+
+class GenerativeBasis(nn.Module): # NEW v2
     def __init__(self, input_channels, output_channels):
         super(GenerativeBasis, self).__init__()
 
-        # learnable basis at 64x64
-        self.Basis = nn.Parameter(torch.empty(output_channels, 64, 64).normal_(0, 1))
+        self.Basis = nn.Parameter(torch.empty(output_channels, 4, 4).normal_(0, 1))
 
-        # project input feature map to a global vector
+        # 1×1 projection of feature map into global vector
         self.Project = nn.Sequential(
             nn.Conv2d(input_channels, 64, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.AdaptiveAvgPool2d((1, 1)),  # -> [N, 64, 1, 1]
+            nn.AdaptiveAvgPool2d((1, 1)),  # → [N, 64, 1, 1]
         )
 
         self.LinearLayer = MSRInitializer(
             nn.Linear(64, output_channels, bias=False)
         )
 
-    def forward(self, x):  # x: [N, in_ch, H, W]
-        features = self.Project(x)              # [N, 64, 1, 1]
-        vec = features.view(x.size(0), -1)      # [N, 64]
-        coeffs = self.LinearLayer(vec)          # [N, OutChannels]
-        # produce [N, OutChannels, 64, 64]
-        out = self.Basis.unsqueeze(0) * coeffs.view(x.size(0), -1, 1, 1)
+    def forward(self, x):  # x: [N, 3, H, W]
+        features = self.Project(x)             # [N, 64, 1, 1]
+        vec = features.view(x.size(0), -1)     # [N, 64]
+        coeffs = self.LinearLayer(vec)         # [N, OutChannels]
+        out = self.Basis.view(1, -1, 4, 4) * coeffs.view(x.size(0), -1, 1, 1)  # [N, OutChannels, 4, 4]
         return out
 
 
-class DiscriminativeBasis(nn.Module):  # safer, size-agnostic
+class DiscriminativeBasis(nn.Module): # OLD
     def __init__(self, InputChannels, OutputDimension):
         super(DiscriminativeBasis, self).__init__()
-
-        # simple 1x1 depthwise-ish projection (no spatial shrink)
-        # using a normal conv (not grouped depthwise) is fine because we
-        # then do global pooling. If you want depthwise, set groups=InputChannels.
-        self.Basis = MSRInitializer(
-            nn.Conv2d(InputChannels, InputChannels, kernel_size=1, stride=1, padding=0, groups=InputChannels, bias=False)
-        )
+        
+        self.Basis = MSRInitializer(nn.Conv2d(InputChannels, InputChannels, kernel_size=4, stride=1, padding=0, groups=InputChannels, bias=False))
         self.LinearLayer = MSRInitializer(nn.Linear(InputChannels, OutputDimension, bias=False))
+        
+    # def forward(self, x):# OLD
+    #     assert x.shape[2:] == (4, 4), f"Expected 4x4, got {x.shape[2:]}"
+    #     return self.LinearLayer(self.Basis(x).view(x.shape[0], -1))
 
-    def forward(self, x):
-        # x -> conv (keeps spatial size) -> global average pool -> linear
-        x = self.Basis(x)                 # [N, C, H, W], H/W preserved
-        x = x.mean(dim=[2, 3])            # global average pool -> [N, C]
+    def forward(self, x): # NEW (IDK WHYYY)
+        x = self.Basis(x)  # Depthwise conv
+        x = x.mean(dim=[2, 3])  # Global average pool [N, C, H, W] → [N, C]
         return self.LinearLayer(x)
-
+    
 
 # class GeneratorStage(nn.Module): # old
 #     def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):

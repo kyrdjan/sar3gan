@@ -128,8 +128,8 @@ def parse_comma_separated_list(s):
 @click.option('--outdir',       help='Where to save the results', metavar='DIR',                required=True)
 @click.option('--g-data',       help='Generator Training data', metavar='[ZIP|DIR]',            type=str, required=True)
 @click.option('--d-data',       help='Discriminator Training data', metavar='[ZIP|DIR]',        type=str, required=True)
-@click.option('--vg-data',      help='Cross Dataset Validation G data', metavar='[ZIP|DIR]',    type=str, required=False)
-@click.option('--vd-data',      help='Cross Dataset Validation D data', metavar='[ZIP|DIR]',    type=str, required=False )
+@click.option('--vg-data',      help='Cross Dataset Validation G data', metavar='[ZIP|DIR]',   type=str, required=False)
+@click.option('--vd-data',      help='Cross Dataset Validation D data', metavar='[ZIP|DIR]',   type=str, required=False )
 @click.option('--gpus',         help='Number of GPUs to use', metavar='INT',                    type=click.IntRange(min=1), required=True)
 @click.option('--batch',        help='Total batch size', metavar='INT',                         type=click.IntRange(min=1), required=True)
 @click.option('--preset',       help='Preset configs', metavar='STR',                           type=str, required=True)
@@ -193,12 +193,12 @@ def main(**kwargs):
 
     if opts.preset == 'TEST-256':
         # -----------------------------
-        # Core architecture (64 → 256)
+        # Core architecture (256×256)
         # -----------------------------
-        WidthPerStage       = [64, 128, 192, 256]   # G grows, D reverses
-        BlocksPerStage      = [2,   2,   2,   2]    # balanced depth
-        CardinalityPerStage = [4,   4,   8,   8]    # more groups at higher res
-        FP16Stages          = [-1, -2]              # mixed precision on last 2 stages
+        WidthPerStage       = [256, 256, 256, 256, 128, 64, 32]   # lighter upper layers
+        BlocksPerStage      = [2, 2, 2, 2, 1, 1, 1]               # fewer blocks at high res
+        CardinalityPerStage = [8, 8, 8, 8, 4, 4, 4]               # grouped convs
+        FP16Stages          = [-1, -2, -3]                        # mixed precision in high res
 
         # -----------------------------
         # Training schedule
@@ -206,7 +206,7 @@ def main(**kwargs):
         dataset_size   = 10_000
         target_epochs  = 30
         decay_nimg     = dataset_size * target_epochs    # 300k images total
-        ema_nimg       = dataset_size * 3                # ~3 epochs EMA warmup
+        ema_nimg       = dataset_size * 3                # 30k images (~3 epochs for EMA warmup)
 
         c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
         c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.1,        'total_nimg': decay_nimg }
