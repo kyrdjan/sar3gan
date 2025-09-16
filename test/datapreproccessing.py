@@ -5,7 +5,7 @@ from tqdm import tqdm
 import shutil
 
 # === CONFIG ===
-zip_path = "datasets/ffhq.zip"     # input zip
+zip_path = "datasets/archive.zip"     # input zip
 work_dir = "datasets"              # output root dir
 hr_dir = os.path.join(work_dir, "ffhq_hr")
 lr_dir = os.path.join(work_dir, "ffhq_lr")

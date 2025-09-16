@@ -73,7 +73,7 @@ class Generator(nn.Module):
         self.img_resolution = kw['img_resolution']
         
         for x in kw['FP16Stages']:
-            self.Model.MainLayers[x].DataType = torch.bfloat16
+            self.Model.MainLayers[x].DataType = torch.float16
 
     def forward(self, lr_image, c=None):
     
@@ -95,7 +95,7 @@ class Discriminator(nn.Module):
         self.Model = R3GAN.Networks.Discriminator(*args, **config)
         
         for x in kw['FP16Stages']:
-            self.Model.MainLayers[x].DataType = torch.bfloat16
+            self.Model.MainLayers[x].DataType = torch.float16
         
     def forward(self, hr_image, c=None):
 

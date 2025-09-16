@@ -157,8 +157,8 @@ def training_loop(
     np.random.seed(random_seed * num_gpus + rank)
     torch.manual_seed(random_seed * num_gpus + rank)
     torch.backends.cudnn.benchmark = cudnn_benchmark    # Improves training speed.
-    torch.backends.cuda.matmul.allow_tf32 = False       # Improves numerical accuracy.(change to True)
-    torch.backends.cudnn.allow_tf32 = False              # Improves numerical accuracy.(change to True)
+    torch.backends.cuda.matmul.allow_tf32 = True       # Improves numerical accuracy.(change to True)
+    torch.backends.cudnn.allow_tf32 = True              # Improves numerical accuracy.(change to True)
     # torch.backends.cudnn.deterministic = False          # Non deterministic convs for speed
     conv2d_gradfix.enabled = True                       # Improves training speed.
     grid_sample_gradfix.enabled = True                  # Avoids errors with the augmentation pipe.
