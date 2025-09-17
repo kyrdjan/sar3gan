@@ -241,8 +241,8 @@ class GeneratorStage(nn.Module):
             x = block(x)
 
         # # Conditional attention at 64x64 # 1st traning
-        # if x.shape[-1] == 64:
-        #     x = self.Attention(x)
+        if x.shape[-1] == 64:
+            x = self.Attention(x)
 
         return x
 
@@ -299,8 +299,8 @@ class DiscriminatorStage(nn.Module):
             # if x.shape[-1] == 64: # 2nd training
             #     x = self.Attention(x)
             x = block(x)
-        # if x.shape[-1] == 64: # 1st training
-        #     x = self.Attention(x)
+        if x.shape[-1] == 64: # 1st training
+            x = self.Attention(x)
         x = self.Transition(x)
         return x
 
