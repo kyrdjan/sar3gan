@@ -147,7 +147,7 @@ def parse_comma_separated_list(s):
 # Misc settings.
 @click.option('--desc',         help='String to include in result dir name', metavar='STR',     type=str)
 @click.option('--metrics',      help='Quality metrics', metavar='[NAME|A,B,C|none]',            type=parse_comma_separated_list, default='fid50k_full', show_default=True)
-@click.option('--kimg',         help='Total training duration', metavar='KIMG',                 type=click.IntRange(min=1), default=1, show_default=True)
+@click.option('--kimg',         help='Total training duration', metavar='KIMG',                 type=click.IntRange(min=1), default=100, show_default=True)
 @click.option('--tick',         help='How often to print progress', metavar='KIMG',             type=click.IntRange(min=1), default=4, show_default=True)
 @click.option('--snap',         help='How often to save snapshots', metavar='TICKS',            type=click.IntRange(min=1), default=50, show_default=True)
 @click.option('--seed',         help='Random seed', metavar='INT',                              type=click.IntRange(min=0), default=0, show_default=True)
@@ -193,12 +193,12 @@ def main(**kwargs):
 
     if opts.preset == 'TEST-256':
         # -----------------------------
-        # Core architecture (64→128→256)
+        # Core architecture (256×256)
         # -----------------------------
-        WidthPerStage       = [64, 128, 256]    # feature widths per stage
+        WidthPerStage       = [256, 256, 256]    # feature widths per stage
         BlocksPerStage      = [2, 2, 2]         # number of conv/residual blocks per stage
         CardinalityPerStage = [8, 8, 8]         # grouped convolutions per stage
-        FP16Stages          = [-1, -2]          # enable FP16 at higher res if desired
+        FP16Stages          = []          # enable FP16 at higher res if desired
 
         # -----------------------------
         # Training schedule
@@ -213,9 +213,6 @@ def main(**kwargs):
         c.lr_scheduler     = { 'base_value': 1e-4, 'final_value': 2e-5,       'total_nimg': decay_nimg }
         c.gamma_scheduler  = { 'base_value': 10.0, 'final_value': 1.0,        'total_nimg': decay_nimg }
         c.beta2_scheduler  = { 'base_value': 0.9,  'final_value': 0.99,       'total_nimg': decay_nimg }
-
-        c.total_kimg = decay_nimg // 1000
-
 
 
     # if opts.preset == 'TEST-256':
