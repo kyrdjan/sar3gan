@@ -195,24 +195,24 @@ def main(**kwargs):
         # -----------------------------
         # Core architecture (256×256)
         # -----------------------------
-        WidthPerStage       = [256, 256, 256]    # feature widths per stage
-        BlocksPerStage      = [2, 2, 2]         # number of conv/residual blocks per stage
-        CardinalityPerStage = [8, 8, 8]         # grouped convolutions per stage
-        FP16Stages          = []          # enable FP16 at higher res if desired
+        WidthPerStage       = [192, 192, 192]      # reduce width (256 → 192)
+        BlocksPerStage      = [2, 2, 2]           # keep depth simple
+        CardinalityPerStage = [4, 4, 4]           # reduce groups (8 → 4)
+        FP16Stages          = []                  # keep off for stability
 
         # -----------------------------
         # Training schedule
         # -----------------------------
         dataset_size   = 10_000
-        target_epochs  = 50                         # train longer for convergence
-        decay_nimg     = dataset_size * target_epochs    # 500k images
-        ema_nimg       = dataset_size * 3                # 30k images (~3 epochs)
+        target_epochs  = 40                        # ~400k images
+        decay_nimg     = dataset_size * target_epochs    # 400k images
+        ema_nimg       = dataset_size * 2                # 20k images (~2 epochs)
 
         c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
-        c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.2,        'total_nimg': decay_nimg }
-        c.lr_scheduler     = { 'base_value': 1e-4, 'final_value': 2e-5,       'total_nimg': decay_nimg }
-        c.gamma_scheduler  = { 'base_value': 10.0, 'final_value': 1.0,        'total_nimg': decay_nimg }
-        c.beta2_scheduler  = { 'base_value': 0.9,  'final_value': 0.99,       'total_nimg': decay_nimg }
+        c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.3,        'total_nimg': decay_nimg }
+        c.lr_scheduler     = { 'base_value': 2e-4, 'final_value': 5e-5,       'total_nimg': decay_nimg }
+        c.gamma_scheduler  = { 'base_value': 5.0,  'final_value': 1.0,        'total_nimg': decay_nimg }
+        c.beta2_scheduler  = { 'base_value': 0.5,  'final_value': 0.99,       'total_nimg': decay_nimg }
 
 
     # if opts.preset == 'TEST-256':
@@ -279,21 +279,21 @@ def main(**kwargs):
     #     c.gamma_scheduler = { 'base_value': 2, 'final_value': 0.2, 'total_nimg': decay_nimg }
     #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
-    if opts.preset == 'FFHQ-256':
-        WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024, 512, 256, 128]]
-        BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1, 1, 1]]
-        CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 16, 8, 4]]
-        FP16Stages = [-1, -2, -3, -4]
-        # NoiseDimension = 64
+    # if opts.preset == 'FFHQ-256':
+    #     WidthPerStage = [3 * x // 4 for x in [1024, 1024, 1024, 1024, 512, 256, 128]]
+    #     BlocksPerStage = [2 * x for x in [1, 1, 1, 1, 1, 1, 1]]
+    #     CardinalityPerStage = [3 * x for x in [32, 32, 32, 32, 16, 8, 4]]
+    #     FP16Stages = [-1, -2, -3, -4]
+    #     # NoiseDimension = 64
        
-        ema_nimg = 500 * 1000
-        decay_nimg = 2e7
+    #     ema_nimg = 500 * 1000
+    #     decay_nimg = 2e7
        
-        c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
-        c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
-        c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
-        c.gamma_scheduler = { 'base_value': 150, 'final_value': 15, 'total_nimg': decay_nimg }
-        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+    #     c.ema_scheduler = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+    #     c.aug_scheduler = { 'base_value': 0, 'final_value': 0.3, 'total_nimg': decay_nimg }
+    #     c.lr_scheduler = { 'base_value': 2e-4, 'final_value': 5e-5, 'total_nimg': decay_nimg }
+    #     c.gamma_scheduler = { 'base_value': 150, 'final_value': 15, 'total_nimg': decay_nimg }
+    #     c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
 
     # if opts.preset == 'ImageNet-32':
     #     WidthPerStage = [6 * x // 4 for x in [1024, 1024, 1024, 1024]]
