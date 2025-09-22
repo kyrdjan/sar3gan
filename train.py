@@ -195,24 +195,24 @@ def main(**kwargs):
         # -----------------------------
         # Core architecture (256×256)
         # -----------------------------
-        WidthPerStage       = [192, 192, 192]      # reduce width (256 → 192)
-        BlocksPerStage      = [2, 2, 2]           # keep depth simple
-        CardinalityPerStage = [4, 4, 4]           # reduce groups (8 → 4)
-        FP16Stages          = []                  # keep off for stability
+        WidthPerStage       = [256, 256, 256, 256, 128, 64, 32]   # lighter upper layers
+        BlocksPerStage      = [2, 2, 2, 2, 1, 1, 1]               # fewer blocks at high res
+        CardinalityPerStage = [8, 8, 8, 8, 4, 4, 4]               # grouped convs
+        FP16Stages          = [-1, -2, -3]                        # mixed precision in high res
 
         # -----------------------------
         # Training schedule
         # -----------------------------
         dataset_size   = 10_000
-        target_epochs  = 40                        # ~400k images
-        decay_nimg     = dataset_size * target_epochs    # 400k images
-        ema_nimg       = dataset_size * 2                # 20k images (~2 epochs)
+        target_epochs  = 30
+        decay_nimg     = dataset_size * target_epochs    # 300k images total
+        ema_nimg       = dataset_size * 3                # 30k images (~3 epochs for EMA warmup)
 
         c.ema_scheduler    = { 'base_value': 0,    'final_value': ema_nimg,   'total_nimg': decay_nimg }
         c.aug_scheduler    = { 'base_value': 0,    'final_value': 0.3,        'total_nimg': decay_nimg }
         c.lr_scheduler     = { 'base_value': 2e-4, 'final_value': 5e-5,       'total_nimg': decay_nimg }
-        c.gamma_scheduler  = { 'base_value': 5.0,  'final_value': 1.0,        'total_nimg': decay_nimg }
-        c.beta2_scheduler  = { 'base_value': 0.5,  'final_value': 0.99,       'total_nimg': decay_nimg }
+        c.gamma_scheduler  = { 'base_value': 2.0,  'final_value': 0.2,        'total_nimg': decay_nimg }
+        c.beta2_scheduler  = { 'base_value': 0.9,  'final_value': 0.99,       'total_nimg': decay_nimg }
 
 
     # if opts.preset == 'TEST-256':

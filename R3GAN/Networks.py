@@ -4,14 +4,28 @@ import torch.nn as nn
 from .Resamplers import InterpolativeUpsampler, InterpolativeDownsampler
 from .FusedOperators import BiasedActivation
 
-def MSRInitializer(Layer, ActivationGain=1):
-    FanIn = Layer.weight.data.size(1) * Layer.weight.data[0][0].numel()
-    Layer.weight.data.normal_(0,  ActivationGain / math.sqrt(FanIn))
+# def MSRInitializer(Layer, ActivationGain=1):
+#     FanIn = Layer.weight.data.size(1) * Layer.weight.data[0][0].numel()
+#     Layer.weight.data.normal_(0,  ActivationGain / math.sqrt(FanIn))
 
+#     if Layer.bias is not None:
+#         Layer.bias.data.zero_()
+        
+#     return Layer
+
+def MSRInitializer(Layer, ActivationGain=1):
+    if isinstance(Layer, nn.Conv2d):
+        fan_in = Layer.weight.size(1) * Layer.weight[0][0].numel()
+    elif isinstance(Layer, nn.Linear):
+        fan_in = Layer.weight.size(1)
+    else:
+        raise ValueError(f"Unsupported layer type: {type(Layer)}")
+
+    Layer.weight.data.normal_(0, ActivationGain / math.sqrt(fan_in))
     if Layer.bias is not None:
         Layer.bias.data.zero_()
-        
     return Layer
+
 
 class Convolution(nn.Module):
     def __init__(self, InputChannels, OutputChannels, KernelSize, Groups=1, ActivationGain=1):
@@ -131,22 +145,22 @@ class DownsampleLayer(nn.Module):
 #         print('GeneraticeBasis input shape=',x.shape)
 #         return self.Basis.view(1, -1, 4, 4) * self.LinearLayer(x).view(x.shape[0], -1, 1, 1)
 
-# class GenerativeBasis(nn.Module): # NEW
-#     def __init__(self, InputChannels, OutputChannels):
-#         super(GenerativeBasis, self).__init__()
-#         self.Basis = nn.Parameter(torch.empty(OutputChannels, 4, 4).normal_(0, 1))
+class GenerativeBasis(nn.Module): # NEW
+    def __init__(self, InputChannels, OutputChannels):
+        super(GenerativeBasis, self).__init__()
+        self.Basis = nn.Parameter(torch.empty(OutputChannels, 4, 4).normal_(0, 1))
 
-#         self.Project = nn.Sequential(
-#             nn.Conv2d(InputChannels, 64, kernel_size=3, padding=1),
-#             nn.ReLU(),
-#             nn.AdaptiveAvgPool2d((1, 1))  # Output: [N, 64, 1, 1]
-#         )
-#         self.LinearLayer = MSRInitializer(nn.Linear(64, OutputChannels, bias=False))
+        self.Project = nn.Sequential(
+            nn.Conv2d(InputChannels, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((1, 1))  # Output: [N, 64, 1, 1]
+        )
+        self.LinearLayer = MSRInitializer(nn.Linear(64, OutputChannels, bias=False))
 
-#     def forward(self, x):  # x: [N, 3, 128, 128]
-#         feat = self.Project(x).view(x.shape[0], -1)  # [N, 64]
-#         out = self.LinearLayer(feat).view(x.shape[0], -1, 1, 1)
-#         return self.Basis.view(1, -1, 4, 4) * out
+    def forward(self, x):  # x: [N, 3, 128, 128]
+        feat = self.Project(x).view(x.shape[0], -1)  # [N, 64]
+        out = self.LinearLayer(feat).view(x.shape[0], -1, 1, 1)
+        return self.Basis.view(1, -1, 4, 4) * out
 
 # class GenerativeBasis(nn.Module): # NEW v2
 #     def __init__(self, input_channels, output_channels):
@@ -171,56 +185,6 @@ class DownsampleLayer(nn.Module):
 #         coeffs = self.LinearLayer(vec)         # [N, OutChannels]
 #         out = self.Basis.view(1, -1, 64, 64) * coeffs.view(x.size(0), -1, 1, 1)  # [N, OutChannels, 4, 4]
 #         return out
-
-class Convolution(nn.Module):
-    def __init__(self, InputChannels, OutputChannels, KernelSize, Groups=1, ActivationGain=1):
-        super().__init__()
-        self.Layer = MSRInitializer(
-            nn.Conv2d(
-                InputChannels, OutputChannels,
-                kernel_size=KernelSize,
-                stride=1,
-                padding=(KernelSize - 1) // 2,
-                groups=Groups,
-                bias=False
-            ),
-            ActivationGain=ActivationGain
-        )
-        self.padding = (KernelSize - 1) // 2
-        self.groups = Groups
-
-    def forward(self, x):
-        return nn.functional.conv2d(
-            x,
-            self.Layer.weight.to(x.dtype),
-            padding=self.padding,
-            groups=self.groups
-        )
-
-
-class GenerativeBasis(nn.Module):  # fixed 256×256 basis
-    def __init__(self, input_channels, output_channels):
-        super().__init__()
-        self.Basis = nn.Parameter(torch.empty(output_channels, 256, 256).normal_(0, 1))
-
-        self.Project = nn.Sequential(
-            nn.Conv2d(input_channels, 64, kernel_size=3, padding=1),
-            nn.ReLU(),
-            nn.AdaptiveAvgPool2d((1, 1)),
-        )
-        self.LinearLayer = MSRInitializer(
-            nn.Linear(64, output_channels, bias=False)
-        )
-
-    def forward(self, x):
-        B = x.size(0)
-        features = self.Project(x).view(B, -1)     # [B, 64] 
-        coeffs = self.LinearLayer(features)        # [B, OutChannels]
-
-        # broadcast multiply → [B, OutCh, 256, 256]
-        out = coeffs.unsqueeze(-1).unsqueeze(-1) * self.Basis.unsqueeze(0)
-        return out
-
 
 
 class DiscriminativeBasis(nn.Module): # OLD
@@ -275,67 +239,42 @@ class DiscriminativeBasis(nn.Module): # OLD
 
 #         return x
 
-# class GeneratorStage(nn.Module):
-#     def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
-#         super().__init__()
-#         self.DataType = DataType
-
-#         # Transition layer
-#         self.Transition = GenerativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
-
-#         # Residual blocks
-#         self.Blocks = nn.ModuleList([
-#             ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter)
-#             for _ in range(NumberOfBlocks)
-#         ])
-
-#         # Self-attention always defined; applied conditionally in forward
-#         self.Attention = SelfAttention(OutputChannels)
-
-#     def forward(self, x):
-#         x = x.to(self.DataType)
-
-#         # Apply transition
-#         x = self.Transition(x)
-
-#         # Residual blocks
-#         for block in self.Blocks:            
-#         # Conditional attention at 64x64
-#             # if x.shape[-1] == 64: # 2nd training
-#             #     x = self.Attention(x)
-#             x = block(x)
-
-#         # # Conditional attention at 64x64 # 1st traning
-#         if x.shape[-1] == 64:
-#             x = self.Attention(x)
-
-#         return x
-
-
-
 class GeneratorStage(nn.Module):
-    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks,
-                 ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter = None,
-                 DataType=torch.float32):
+    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
         super().__init__()
         self.DataType = DataType
 
-        # always start with GenerativeBasis
-        self.Transition = GenerativeBasis(InputChannels, OutputChannels)
+        # Transition layer
+        self.Transition = GenerativeBasis(InputChannels, OutputChannels) if ResamplingFilter is None else UpsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
 
+        # Residual blocks
         self.Blocks = nn.ModuleList([
-            ResidualBlock(OutputChannels, Cardinality, ExpansionFactor,
-                          KernelSize, VarianceScalingParameter)
+            ResidualBlock(OutputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter)
             for _ in range(NumberOfBlocks)
         ])
+
+        # Self-attention always defined; applied conditionally in forward
         self.Attention = SelfAttention(OutputChannels)
 
     def forward(self, x):
         x = x.to(self.DataType)
+
+        # Apply transition
         x = self.Transition(x)
-        for block in self.Blocks:
+
+        # Residual blocks
+        for block in self.Blocks:            
+        # Conditional attention at 64x64
+            # if x.shape[-1] == 64: # 2nd training
+            #     x = self.Attention(x)
             x = block(x)
+
+        # # Conditional attention at 64x64 # 1st traning
+        if x.shape[-1] == 64:
+            x = self.Attention(x)
+
         return x
+
 
     
 # class DiscriminatorStage(nn.Module): # old
@@ -375,70 +314,36 @@ class GeneratorStage(nn.Module):
 #         return x
 
 
-# class DiscriminatorStage(nn.Module):
-#     def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
-#         super().__init__()
-#         self.DataType = DataType
-#         self.Blocks = nn.ModuleList([ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)])
-#         self.Attention = SelfAttention(InputChannels)
-#         if ResamplingFilter is None:
-#             # Instead of hard 4x4 DiscriminativeBasis
-#             self.Transition = nn.AdaptiveAvgPool2d((1, 1))
-#             self.Linear = MSRInitializer(nn.Linear(InputChannels, OutputChannels, bias=False))
-#         else:
-#             self.Transition = DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
-#             self.Linear = None
-
-#     def forward(self, x):
-#         x = x.to(self.DataType)
-#         for block in self.Blocks:
-#             x = block(x)
-
-#         if x.shape[-1] == 64: # 1st training
-#             x = self.Attention(x)
-
-#         if isinstance(self.Transition, nn.AdaptiveAvgPool2d):
-#             x = self.Transition(x)       # [B, C, 1, 1]
-#             x = x.view(x.size(0), -1)    # [B, C]
-#             x = self.Linear(x)           # [B, OutDim]
-#         else:
-#             x = self.Transition(x)
-
-#         return x
-
 class DiscriminatorStage(nn.Module):
-    def __init__(self, InputChannels, OutputChannels, Cardinality,
-                 NumberOfBlocks, ExpansionFactor, KernelSize,
-                 VarianceScalingParameter, DataType=torch.float32):
+    def __init__(self, InputChannels, OutputChannels, Cardinality, NumberOfBlocks, ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter=None, DataType=torch.float32):
         super().__init__()
         self.DataType = DataType
-        self.Blocks = nn.ModuleList([
-            ResidualBlock(InputChannels, Cardinality, ExpansionFactor,
-                          KernelSize, VarianceScalingParameter)
-            for _ in range(NumberOfBlocks)
-        ])
+        self.Blocks = nn.ModuleList([ResidualBlock(InputChannels, Cardinality, ExpansionFactor, KernelSize, VarianceScalingParameter) for _ in range(NumberOfBlocks)])
         self.Attention = SelfAttention(InputChannels)
-
-        # two paths: conv-stage vs flat-stage
-        self.Transition = nn.AdaptiveAvgPool2d((1, 1))
-        self.Linear = MSRInitializer(nn.Linear(InputChannels, OutputChannels, bias=False))
+        if ResamplingFilter is None:
+            # Instead of hard 4x4 DiscriminativeBasis
+            self.Transition = nn.AdaptiveAvgPool2d((1, 1))
+            self.Linear = MSRInitializer(nn.Linear(InputChannels, OutputChannels, bias=False))
+        else:
+            self.Transition = DownsampleLayer(InputChannels, OutputChannels, ResamplingFilter)
+            self.Linear = None
 
     def forward(self, x):
-        # 🔹 Check if feature map or already flat
-        if x.ndim == 2:  
-            # already flat → just apply linear
-            return self.Linear(x)
-
-        # otherwise normal conv path
         x = x.to(self.DataType)
         for block in self.Blocks:
             x = block(x)
 
-        x = self.Transition(x)      # [B,C,1,1]
-        x = x.view(x.size(0), -1)   # [B,C]
-        x = self.Linear(x)          # [B,OutDim]
-        return x
+        if x.shape[-1] == 64: # 1st training
+            x = self.Attention(x)
 
+        if isinstance(self.Transition, nn.AdaptiveAvgPool2d):
+            x = self.Transition(x)       # [B, C, 1, 1]
+            x = x.view(x.size(0), -1)    # [B, C]
+            x = self.Linear(x)           # [B, OutDim]
+        else:
+            x = self.Transition(x)
+
+        return x
 
 # class Generator(nn.Module): #OLD
 #     def __init__(self, WidthPerStage, CardinalityPerStage, BlocksPerStage, ExpansionFactor, ConditionDimension=None, ConditionEmbeddingDimension=3, KernelSize=3, ResamplingFilter=[1, 2, 1]):
@@ -465,58 +370,15 @@ class DiscriminatorStage(nn.Module):
 #             x = Layer(x)
 #         return self.AggregationLayer(x)
 
-# class Generator(nn.Module):
-#     def __init__(self, WidthPerStage, CardinalityPerStage, BlocksPerStage,
-#                  ExpansionFactor, ConditionDimension=None, ConditionEmbeddingDimension=3,
-#                  KernelSize=3, ResamplingFilter=[1, 2, 1]):
-#         super(Generator, self).__init__()
-
-#         VarianceScalingParameter = sum(BlocksPerStage)
-
-#         # First stage: starts with 64×64 basis
-#         MainLayers = [
-#             GeneratorStage(
-#                 3 if ConditionDimension is None else 3 + ConditionEmbeddingDimension,
-#                 WidthPerStage[0], CardinalityPerStage[0], BlocksPerStage[0],
-#                 ExpansionFactor, KernelSize, VarianceScalingParameter,
-#                 ResamplingFilter=None
-#             )
-#         ]
-#         # Remaining stages (upsampling as usual)
-#         MainLayers += [
-#             GeneratorStage(
-#                 WidthPerStage[i], WidthPerStage[i + 1], CardinalityPerStage[i + 1],
-#                 BlocksPerStage[i + 1], ExpansionFactor, KernelSize,
-#                 VarianceScalingParameter, ResamplingFilter
-#             )
-#             for i in range(len(WidthPerStage) - 1)
-#         ]
-
-#         self.MainLayers = nn.ModuleList(MainLayers)
-#         self.AggregationLayer = Convolution(WidthPerStage[-1], 3, KernelSize=1)
-
-#         if ConditionDimension is not None:
-#             self.EmbeddingLayer = MSRInitializer(
-#                 nn.Linear(ConditionDimension, ConditionEmbeddingDimension, bias=False)
-#             )
-
-#     def forward(self, x, y=None):
-#         if hasattr(self, 'EmbeddingLayer'):
-#             cond = self.EmbeddingLayer(y).view(y.shape[0], -1, 1, 1)
-#             x = torch.cat([x, cond.expand(-1, -1, x.shape[2], x.shape[3])], dim=1)
-
-#         for Layer in self.MainLayers:
-#             x = Layer(x)
-
-#         x = self.AggregationLayer(x)
-#         return x
 class Generator(nn.Module):
     def __init__(self, WidthPerStage, CardinalityPerStage, BlocksPerStage,
                  ExpansionFactor, ConditionDimension=None, ConditionEmbeddingDimension=3,
-                 KernelSize=3):
-        super().__init__()
+                 KernelSize=3, ResamplingFilter=[1, 2, 1]):
+        super(Generator, self).__init__()
+
         VarianceScalingParameter = sum(BlocksPerStage)
 
+        # First stage: starts with 64×64 basis
         MainLayers = [
             GeneratorStage(
                 3 if ConditionDimension is None else 3 + ConditionEmbeddingDimension,
@@ -525,9 +387,18 @@ class Generator(nn.Module):
                 ResamplingFilter=None
             )
         ]
+        # Remaining stages (upsampling as usual)
+        MainLayers += [
+            GeneratorStage(
+                WidthPerStage[i], WidthPerStage[i + 1], CardinalityPerStage[i + 1],
+                BlocksPerStage[i + 1], ExpansionFactor, KernelSize,
+                VarianceScalingParameter, ResamplingFilter
+            )
+            for i in range(len(WidthPerStage) - 1)
+        ]
 
         self.MainLayers = nn.ModuleList(MainLayers)
-        self.AggregationLayer = Convolution(WidthPerStage[0], 3, KernelSize=1)
+        self.AggregationLayer = Convolution(WidthPerStage[-1], 3, KernelSize=1)
 
         if ConditionDimension is not None:
             self.EmbeddingLayer = MSRInitializer(
@@ -542,96 +413,29 @@ class Generator(nn.Module):
         for Layer in self.MainLayers:
             x = Layer(x)
 
-        return self.AggregationLayer(x)
+        x = self.AggregationLayer(x)
+        return x
 
 
-# class Discriminator(nn.Module):
-#     def __init__(self, WidthPerStage, CardinalityPerStage, BlocksPerStage, ExpansionFactor, ConditionDimension=None, ConditionEmbeddingDimension=3, KernelSize=3, ResamplingFilter=[1, 2, 1]):
-#         super(Discriminator, self).__init__()
 
-#         VarianceScalingParameter = sum(BlocksPerStage)
-
-#         self.ExtractionLayer = Convolution(3 if ConditionDimension is None else 3 + ConditionEmbeddingDimension, WidthPerStage[0], KernelSize=1)
-
-#         MainLayers = [DiscriminatorStage(WidthPerStage[i], WidthPerStage[i + 1], CardinalityPerStage[i], BlocksPerStage[i], ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter) for i in range(len(WidthPerStage) - 1)]
-#         MainLayers += [DiscriminatorStage(WidthPerStage[-1], WidthPerStage[-1], CardinalityPerStage[-1], BlocksPerStage[-1], ExpansionFactor, KernelSize, VarianceScalingParameter)]
-
-#         self.MainLayers = nn.ModuleList(MainLayers)
-
-#         if ConditionDimension is not None:
-#             self.EmbeddingLayer = MSRInitializer(nn.Linear(ConditionDimension, ConditionEmbeddingDimension, bias=False), ActivationGain=1 / math.sqrt(ConditionEmbeddingDimension))
-
-#     def forward(self, x, y=None):
-
-#         if hasattr(self, 'EmbeddingLayer'):
-#             cond = self.EmbeddingLayer(y).view(y.shape[0], -1, 1, 1)
-#             x = torch.cat([x, cond.expand(-1, -1, x.shape[2], x.shape[3])], dim=1)
-
-#         x = self.ExtractionLayer(x.to(self.MainLayers[0].DataType))
-
-#         for i, Layer in enumerate(self.MainLayers):
-#             x = Layer(x)
-
-#         return x.view(x.shape[0], -1).mean(dim=1)  # [B]
 class Discriminator(nn.Module):
-    def __init__(self,
-                 WidthPerStage,          # list of widths per stage (e.g. [64,128,256])
-                 CardinalityPerStage,    # list of cardinalities per stage
-                 BlocksPerStage,         # list of block counts per stage
-                 ExpansionFactor,
-                 ConditionDimension=None,
-                 ConditionEmbeddingDimension=3,
-                 KernelSize=3,
-                 ResamplingFilter=[1, 2, 1]):
-        super().__init__()
+    def __init__(self, WidthPerStage, CardinalityPerStage, BlocksPerStage, ExpansionFactor, ConditionDimension=None, ConditionEmbeddingDimension=3, KernelSize=3, ResamplingFilter=[1, 2, 1]):
+        super(Discriminator, self).__init__()
 
-        # Keep the old-style variance scaling (sum over blocks per stage)
         VarianceScalingParameter = sum(BlocksPerStage)
 
-        # Extraction layer must use the first stage width (an int)
-        first_width = WidthPerStage[0]
-        in_channels = 3 if ConditionDimension is None else 3 + ConditionEmbeddingDimension
-        self.ExtractionLayer = Convolution(in_channels, first_width, KernelSize=1)
+        self.ExtractionLayer = Convolution(3 if ConditionDimension is None else 3 + ConditionEmbeddingDimension, WidthPerStage[0], KernelSize=1)
 
-        # Build the main stage list using the stage-wise lists passed in
-        MainLayers = [
-            DiscriminatorStage(
-                WidthPerStage[i],          # InputChannels (int)
-                WidthPerStage[i + 1],      # OutputChannels (int)
-                CardinalityPerStage[i],    # Cardinality for this stage
-                BlocksPerStage[i],         # Number of blocks for this stage
-                ExpansionFactor,
-                KernelSize,
-                VarianceScalingParameter,
-                DataType=torch.float32
-            )
-            for i in range(len(WidthPerStage) - 1)
-        ]
-
-        # Last stage (no change in width; keeps same in/out channels)
-        MainLayers.append(
-            DiscriminatorStage(
-                WidthPerStage[-1],
-                WidthPerStage[-1],
-                CardinalityPerStage[-1],
-                BlocksPerStage[-1],
-                ExpansionFactor,
-                KernelSize,
-                VarianceScalingParameter,
-                DataType=torch.float32
-            )
-        )
+        MainLayers = [DiscriminatorStage(WidthPerStage[i], WidthPerStage[i + 1], CardinalityPerStage[i], BlocksPerStage[i], ExpansionFactor, KernelSize, VarianceScalingParameter, ResamplingFilter) for i in range(len(WidthPerStage) - 1)]
+        MainLayers += [DiscriminatorStage(WidthPerStage[-1], WidthPerStage[-1], CardinalityPerStage[-1], BlocksPerStage[-1], ExpansionFactor, KernelSize, VarianceScalingParameter)]
 
         self.MainLayers = nn.ModuleList(MainLayers)
 
-        # Conditional embedding (if used) — keep original activation gain
         if ConditionDimension is not None:
-            self.EmbeddingLayer = MSRInitializer(
-                nn.Linear(ConditionDimension, ConditionEmbeddingDimension, bias=False),
-                ActivationGain=1 / math.sqrt(ConditionEmbeddingDimension)
-            )
+            self.EmbeddingLayer = MSRInitializer(nn.Linear(ConditionDimension, ConditionEmbeddingDimension, bias=False), ActivationGain=1 / math.sqrt(ConditionEmbeddingDimension))
 
     def forward(self, x, y=None):
+
         if hasattr(self, 'EmbeddingLayer'):
             cond = self.EmbeddingLayer(y).view(y.shape[0], -1, 1, 1)
             x = torch.cat([x, cond.expand(-1, -1, x.shape[2], x.shape[3])], dim=1)
@@ -641,6 +445,4 @@ class Discriminator(nn.Module):
         for i, Layer in enumerate(self.MainLayers):
             x = Layer(x)
 
-        out = x.view(x.shape[0], -1).mean(dim=1)
-        return out
-
+        return x.view(x.shape[0], -1).mean(dim=1)  # [B]
