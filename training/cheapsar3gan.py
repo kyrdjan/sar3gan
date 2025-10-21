@@ -1,307 +1,315 @@
-import os
-import shutil
-from tqdm import tqdm
-import zipfile
-from io import BytesIO
+# ============================================================
+# complete_training_fir_64x256.py — 64x64 → 256x256 version (final fixed)
+# ============================================================
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
+import os, sys, shutil, zipfile, math
+from io import BytesIO
+from tqdm import tqdm
+import torch, torch.nn as nn, torch.optim as optim, torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
 from torchvision.utils import save_image
 from PIL import Image, ImageDraw, ImageFont
 from torchinfo import summary
 from pytorch_fid import fid_score
-import sys
+import numpy as np
 
-# -----------------------
-# Dataset
-# -----------------------
+# Add the folder containing torch_utils to the Python path
+sys.path.append(os.path.abspath("."))
+from torch_utils.ops import upfirdn2d
+
+# ============================================================
+# FIR Kernel and Resamplers
+# ============================================================
+def CreateLowpassKernel(weights, inplace=False):
+    kernel = np.array([weights]) if inplace else np.convolve(weights, [1, 1]).reshape(1, -1)
+    kernel = torch.Tensor(kernel.T @ kernel)
+    return kernel / torch.sum(kernel)
+
+class InterpolativeUpsamplerCUDA(nn.Module):
+    def __init__(self, Filter):
+        super().__init__()
+        self.register_buffer('Kernel', CreateLowpassKernel(Filter))
+    def forward(self, x): return upfirdn2d.upsample2d(x, self.Kernel)
+
+class InterpolativeDownsamplerCUDA(nn.Module):
+    def __init__(self, Filter):
+        super().__init__()
+        self.register_buffer('Kernel', CreateLowpassKernel(Filter))
+    def forward(self, x): return upfirdn2d.downsample2d(x, self.Kernel)
+
+InterpolativeUpsampler = InterpolativeUpsamplerCUDA
+InterpolativeDownsampler = InterpolativeDownsamplerCUDA
+
+# ============================================================
+# Dataset Loader (paired ZIPs)
+# ============================================================
 class ImagePairZipDataset(Dataset):
     def __init__(self, hr_zip_path, lr_zip_path, transform_hr=None, transform_lr=None):
         self.hr_zip = zipfile.ZipFile(hr_zip_path, 'r')
         self.lr_zip = zipfile.ZipFile(lr_zip_path, 'r')
-        self.transform_hr = transform_hr
-        self.transform_lr = transform_lr
+        self.transform_hr, self.transform_lr = transform_hr, transform_lr
         valid_exts = (".png", ".jpg", ".jpeg", ".bmp", ".tiff")
         self.hr_images = sorted([f for f in self.hr_zip.namelist() if f.lower().endswith(valid_exts)])
         self.lr_images = sorted([f for f in self.lr_zip.namelist() if f.lower().endswith(valid_exts)])
-        if len(self.hr_images) == 0 or len(self.lr_images) == 0:
+        if not self.hr_images or not self.lr_images:
             raise ValueError("No valid images found in the zip files!")
-
-    def __len__(self):
-        return min(len(self.hr_images), len(self.lr_images))
-
+    def __len__(self): return min(len(self.hr_images), len(self.lr_images))
     def __getitem__(self, idx):
-        hr_data = self.hr_zip.read(self.hr_images[idx])
-        lr_data = self.lr_zip.read(self.lr_images[idx])
-        hr_img = Image.open(BytesIO(hr_data)).convert("RGB")
-        lr_img = Image.open(BytesIO(lr_data)).convert("RGB")
-        if self.transform_hr:
-            hr_img = self.transform_hr(hr_img)
-        if self.transform_lr:
-            lr_img = self.transform_lr(lr_img)
+        hr_img = Image.open(BytesIO(self.hr_zip.read(self.hr_images[idx]))).convert("RGB")
+        lr_img = Image.open(BytesIO(self.lr_zip.read(self.lr_images[idx]))).convert("RGB")
+        if self.transform_hr: hr_img = self.transform_hr(hr_img)
+        if self.transform_lr: lr_img = self.transform_lr(lr_img)
         return lr_img, hr_img
 
-# -----------------------
-# Save Images Utility
-# -----------------------
-def denormalize(t):
-    """Convert [-1,1] → [0,1] for saving"""
-    t = (t + 1) / 2
-    return t.clamp(0, 1)
+# ============================================================
+# Utility
+# ============================================================
+def denormalize(t): return ((t + 1) / 2).clamp(0, 1)
 
-def save_with_labels(tensors, labels, filename):
+def save_with_labels(tensors, labels, filename, target_size=(256, 256)):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
-
-    resized_tensors = []
+    imgs = []
     for i, t in enumerate(tensors):
         t = denormalize(t)
-        c, h, w = t.shape
-        if labels[i] == "LR":
-            # Force LR to be shown pixelated
-            t = F.interpolate(t.unsqueeze(0), size=(256, 256), mode="nearest").squeeze(0)
-        resized_tensors.append(t)
-
-    grid_file = filename.replace(".png", "_grid.png")
-    save_image(torch.stack(resized_tensors, 0), grid_file, nrow=len(resized_tensors), normalize=False)
-
-    # Add labels
-    img = Image.open(grid_file).convert("RGB")
+        mode = "nearest" if labels[i].upper() == "LR" else "bilinear"
+        t = F.interpolate(t.unsqueeze(0), size=target_size, mode=mode, align_corners=False).squeeze(0)
+        imgs.append(t)
+    tmp = filename.replace(".png", "_grid.png")
+    save_image(torch.stack(imgs), tmp, nrow=len(imgs))
+    img = Image.open(tmp).convert("RGB")
     draw = ImageDraw.Draw(img)
-    try:
-        font = ImageFont.truetype("arial.ttf", 16)
-    except:
-        font = ImageFont.load_default()
-
-    w, h = img.size
+    try: font = ImageFont.truetype("arial.ttf", 18)
+    except: font = ImageFont.load_default()
+    w, _ = img.size
     step = w // len(tensors)
     for i, label in enumerate(labels):
         draw.text((i * step + 5, 5), label, fill="white", font=font)
-
     img.save(filename)
-    os.remove(grid_file)
+    os.remove(tmp)
 
-# -----------------------
-# Lightweight GAN Architecture
-# -----------------------
-class ResidualBlock(nn.Module):
-    def __init__(self, channels):
+# ============================================================
+# Network Building Blocks
+# ============================================================
+def MSRInitializer(layer, gain=1.0):
+    if hasattr(layer, "weight"):
+        nn.init.normal_(layer.weight, mean=0.0,
+                        std=gain / math.sqrt(layer.weight.data.size(1) * layer.weight[0][0].numel()))
+    if hasattr(layer, "bias") and layer.bias is not None:
+        nn.init.zeros_(layer.bias)
+    return layer
+
+class Convolution(nn.Module):
+    def __init__(self, in_ch, out_ch, k=3):
         super().__init__()
-        self.conv1 = nn.Conv2d(channels, channels, 3, padding=1)
-        self.conv2 = nn.Conv2d(channels, channels, 3, padding=1)
-        self.relu = nn.ReLU(True)
+        self.layer = MSRInitializer(nn.Conv2d(in_ch, out_ch, k, padding=(k-1)//2))
+    def forward(self, x): return self.layer(x)
 
+class ResidualBlock(nn.Module):
+    def __init__(self, ch):
+        super().__init__()
+        self.conv1, self.conv2 = Convolution(ch, ch), Convolution(ch, ch)
+        self.act = nn.ReLU(inplace=True)
     def forward(self, x):
-        out = self.relu(self.conv1(x))
-        out = self.conv2(out)
-        return self.relu(out + x)
+        y = self.act(self.conv1(x))
+        y = self.conv2(y)
+        return self.act(x + y)
 
 class SelfAttention(nn.Module):
-    def __init__(self, in_channels):
+    def __init__(self, ch):
         super().__init__()
-        self.query = nn.Conv2d(in_channels, in_channels//8, 1)
-        self.key = nn.Conv2d(in_channels, in_channels//8, 1)
-        self.value = nn.Conv2d(in_channels, in_channels, 1)
+        self.query, self.key = [MSRInitializer(nn.Conv2d(ch, ch // 8, 1)) for _ in range(2)]
+        self.value = MSRInitializer(nn.Conv2d(ch, ch, 1))
         self.gamma = nn.Parameter(torch.zeros(1))
 
     def forward(self, x):
-        b, c, h, w = x.size()
-        q = self.query(x).view(b, -1, h*w).permute(0, 2, 1)
-        k = self.key(x).view(b, -1, h*w)
-        attn = F.softmax(torch.bmm(q, k), dim=-1)
-        v = self.value(x).view(b, -1, h*w)
-        out = torch.bmm(v, attn.permute(0,2,1)).view(b, c, h, w)
-        return self.gamma * out + x
+        B, C, H, W = x.shape
+        q = self.query(x).view(B, -1, H * W).permute(0, 2, 1)
+        k = self.key(x).view(B, -1, H * W)
+        att = torch.softmax(torch.bmm(q, k), dim=-1)
+        v = self.value(x).view(B, -1, H * W)
+        out = torch.bmm(v, att.permute(0, 2, 1)).view(B, C, H, W)
+        return x + self.gamma * out
+
+class UpsampleLayer(nn.Module):
+    def __init__(self, in_ch, out_ch, Filter=[1,2,1]):
+        super().__init__()
+        self.resampler = InterpolativeUpsampler(Filter)
+        self.proj = Convolution(in_ch, out_ch, 1)
+    def forward(self, x): return self.proj(self.resampler(x))
+
+class DownsampleLayer(nn.Module):
+    def __init__(self, in_ch, out_ch, Filter=[1,2,1]):
+        super().__init__()
+        self.resampler = InterpolativeDownsampler(Filter)
+        self.proj = Convolution(in_ch, out_ch, 1)
+    def forward(self, x): return self.proj(self.resampler(x))
+
+# ============================================================
+# Generator & Discriminator (ends at 256×256)
+# ============================================================
+class GeneratorStage(nn.Module):
+    def __init__(self, in_ch, out_ch, *, num_blocks=2, ResamplingFilter=None):
+        super().__init__()
+        self.transition = UpsampleLayer(in_ch, out_ch, ResamplingFilter) if ResamplingFilter else Convolution(in_ch, out_ch)
+        self.blocks = nn.ModuleList([ResidualBlock(out_ch) for _ in range(num_blocks)])
+        self.attn = SelfAttention(out_ch)
+    def forward(self, x):
+        x = self.transition(x)
+        for b in self.blocks: x = b(x)
+        return self.attn(x)
+
+class DiscriminatorStage(nn.Module):
+    def __init__(self, in_ch, out_ch, *, num_blocks=2, ResamplingFilter=None):
+        super().__init__()
+        self.blocks = nn.ModuleList([ResidualBlock(in_ch) for _ in range(num_blocks)])
+        self.down = DownsampleLayer(in_ch, out_ch, ResamplingFilter) if ResamplingFilter else None
+        self.proj = Convolution(in_ch, out_ch, 1) if not ResamplingFilter else None
+        self.attn = SelfAttention(out_ch)
+    def forward(self, x):
+        for b in self.blocks: x = b(x)
+        x = self.down(x) if self.down else self.proj(x)
+        return self.attn(x)
 
 class Generator(nn.Module):
-    def __init__(self, in_channels=3, base_channels=64):
+    def __init__(self, ResamplingFilter=[1,2,1]):
         super().__init__()
-        self.initial = nn.Conv2d(in_channels, base_channels, 3, padding=1)
-        self.resblocks = nn.Sequential(*[ResidualBlock(base_channels) for _ in range(4)])  # bumped to 4
-        self.upsample1 = nn.Upsample(scale_factor=2)
-        self.conv_mid = nn.Conv2d(base_channels, base_channels, 3, padding=1)
-        self.attn = SelfAttention(base_channels)
-        self.upsample2 = nn.Upsample(scale_factor=2)
-        self.final = nn.Conv2d(base_channels, 3, 3, padding=1)
+        self.stage1 = GeneratorStage(3, 64, num_blocks=2, ResamplingFilter=None)   # 64×64
+        self.stage2 = GeneratorStage(64, 128, num_blocks=2, ResamplingFilter=ResamplingFilter)  # →128×128
+        self.stage3 = GeneratorStage(128, 256, num_blocks=2, ResamplingFilter=ResamplingFilter) # →256×256
+        self.agg = Convolution(256, 3, 1)
         self.tanh = nn.Tanh()
-
     def forward(self, x):
-        x = self.initial(x)
-        x = self.resblocks(x)
-        x = self.upsample1(x)
-        x = self.conv_mid(x)
-        if x.shape[2] == 64:
-            x = self.attn(x)
-        x = self.upsample2(x)
-        x = self.final(x)
-        return self.tanh(x)
+        x = self.stage1(x)
+        x = self.stage2(x)
+        x = self.stage3(x)
+        return self.tanh(self.agg(x))
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=3, base_channels=64):
+    def __init__(self, ResamplingFilter=[1,2,1]):
         super().__init__()
-        self.conv1 = nn.Conv2d(in_channels, base_channels, 4, 2, 1)
-        self.lrelu = nn.LeakyReLU(0.2, inplace=True)
-        self.resblocks = nn.Sequential(*[ResidualBlock(base_channels) for _ in range(2)])
-        self.attn = SelfAttention(base_channels)
-        self.conv2 = nn.Conv2d(base_channels, base_channels*2, 4, 2, 1)
+        self.extract = Convolution(3, 64, 1)
+        self.stage1 = DiscriminatorStage(64, 128, num_blocks=2, ResamplingFilter=ResamplingFilter)
+        self.stage2 = DiscriminatorStage(128, 256, num_blocks=2, ResamplingFilter=ResamplingFilter)
+        self.stage3 = DiscriminatorStage(256, 512, num_blocks=2, ResamplingFilter=None)
         self.gap = nn.AdaptiveAvgPool2d(1)
-        self.fc = nn.Linear(base_channels*2, 1)
-
+        self.fc = MSRInitializer(nn.Linear(512, 1))
     def forward(self, x):
-        x = self.lrelu(self.conv1(x))
-        x = self.resblocks(x)
-        if x.shape[2] == 64:
-            x = self.attn(x)
-        x = self.lrelu(self.conv2(x))
-        x = self.gap(x).view(x.size(0), -1)
-        return self.fc(x)
+        x = self.extract(x)
+        x = self.stage1(x)
+        x = self.stage2(x)
+        x = self.stage3(x)
+        return self.fc(self.gap(x).view(x.size(0), -1)).view(-1)
 
-# -----------------------
-# Training Helper
-# -----------------------
+# ============================================================
+# Adversarial Training
+# ============================================================
 class AdversarialTraining:
     def __init__(self, G, D, device="cuda"):
-        self.G = G
-        self.D = D
-        self.device = device
+        self.G, self.D, self.device = G, D, device
+    @staticmethod
+    def ZeroCenteredGradientPenalty(samples, logits):
+        gradients, = torch.autograd.grad(outputs=logits.sum(), inputs=samples, create_graph=True)
+        return gradients.pow(2).reshape(gradients.size(0), -1).sum(1)
+    def GeneratorLoss(self, Lr, Hr):
+        fake = self.G(Lr)
+        return F.softplus(-self.D(fake)).mean(), fake
+    def DiscriminatorLoss(self, Lr, Hr, Gamma=10.0):
+        Hr = Hr.detach().requires_grad_(True)
+        fake = self.G(Lr).detach().requires_grad_(True)
+        real_logits, fake_logits = self.D(Hr), self.D(fake)
+        d_loss = F.softplus(fake_logits).mean() + F.softplus(-real_logits).mean()
+        r1 = self.ZeroCenteredGradientPenalty(Hr, real_logits).mean()
+        r2 = self.ZeroCenteredGradientPenalty(fake, fake_logits).mean()
+        return d_loss, d_loss + (Gamma / 2.0) * (r1 + r2), r1, r2
 
-    def AccumulateDiscriminatorGradients(self, LrImages, RealSamples, Gamma=10.0):
-        fake = self.G(LrImages).detach()
-        real_logits = self.D(RealSamples)
-        fake_logits = self.D(fake)
-        d_loss = (F.softplus(fake_logits) + F.softplus(-real_logits)).mean()
+# ============================================================
+# Training Script
+# ============================================================
+class Logger:
+    def __init__(self, path):
+        self.terminal, self.log = sys.stdout, open(path, "a", encoding="utf-8")
+    def write(self, msg):
+        self.terminal.write(msg); self.log.write(msg)
+    def flush(self): self.terminal.flush(); self.log.flush()
 
-        real_samples = RealSamples.requires_grad_(True)
-        grad_real = torch.autograd.grad(
-            outputs=self.D(real_samples).sum(), inputs=real_samples,
-            create_graph=True, retain_graph=True, only_inputs=True
-        )[0]
-        r1_penalty = grad_real.pow(2).reshape(grad_real.size(0), -1).sum(1).mean()
-
-        fake_samples = fake.requires_grad_(True)
-        grad_fake = torch.autograd.grad(
-            outputs=self.D(fake_samples).sum(), inputs=fake_samples,
-            create_graph=True, retain_graph=True, only_inputs=True
-        )[0]
-        r2_penalty = grad_fake.pow(2).reshape(grad_fake.size(0), -1).sum(1).mean()
-
-        d_loss_total = d_loss + Gamma*(r1_penalty + r2_penalty)
-        d_loss_total.backward()
-        return d_loss.detach(), d_loss_total.detach(), r1_penalty.detach(), r2_penalty.detach()
-
-    def AccumulateGeneratorGradients(self, LrImages):
-        fake = self.G(LrImages)
-        g_loss = F.softplus(-self.D(fake)).mean()
-        g_loss.backward()
-        return g_loss.detach(), fake
-
-# -----------------------
-# FID Evaluation
-# -----------------------
 def evaluate_fid(G, dataloader, device, step, save_dir="fid_eval", num_images=500):
-    real_dir = os.path.join(save_dir, "real")
-    fake_dir = os.path.join(save_dir, "fake")
-    if os.path.exists(save_dir):
-        shutil.rmtree(save_dir)
-    os.makedirs(real_dir, exist_ok=True)
-    os.makedirs(fake_dir, exist_ok=True)
-    G.eval()
-    count = 0
+    real_dir, fake_dir = os.path.join(save_dir,"real"), os.path.join(save_dir,"fake")
+    if os.path.exists(save_dir): shutil.rmtree(save_dir)
+    os.makedirs(real_dir); os.makedirs(fake_dir)
+    G.eval(); count = 0
     with torch.no_grad():
-        for lr_imgs, hr_imgs in dataloader:
-            lr_imgs, hr_imgs = lr_imgs.to(device), hr_imgs.to(device)
-            fake_imgs = G(lr_imgs)
-            for i in range(lr_imgs.size(0)):
+        for lr, hr in dataloader:
+            lr, hr = lr.to(device), hr.to(device)
+            fake = G(lr)
+            for i in range(lr.size(0)):
                 if count >= num_images: break
-                save_image(denormalize(hr_imgs[i]), os.path.join(real_dir, f"{count}.png"), normalize=False)
-                save_image(denormalize(fake_imgs[i]), os.path.join(fake_dir, f"{count}.png"), normalize=False)
+                save_image(denormalize(hr[i]), f"{real_dir}/{count}.png")
+                save_image(denormalize(fake[i]), f"{fake_dir}/{count}.png")
                 count += 1
             if count >= num_images: break
     fid = fid_score.calculate_fid_given_paths([real_dir, fake_dir], batch_size=2, device=device, dims=2048)
     print(f"Step {step}: FID = {fid:.2f}")
     return fid
 
-# -----------------------
-# Logger
-# -----------------------
-class Logger:
-    def __init__(self, filepath):
-        self.terminal = sys.stdout
-        self.log = open(filepath, "a", encoding="utf-8")
-    def write(self, message):
-        self.terminal.write(message)
-        self.log.write(message)
-    def flush(self):
-        self.terminal.flush()
-        self.log.flush()
-
-# -----------------------
-# Training Script
-# -----------------------
 def main():
-    save_dir = "training_snapshots"
+    save_dir = "training_snapshots_64to256"
     os.makedirs(save_dir, exist_ok=True)
     sys.stdout = Logger(os.path.join(save_dir, "log.txt"))
-
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Transforms for LR and HR
-    transform_lr = transforms.Compose([transforms.Resize((64,64)), transforms.ToTensor(), transforms.Normalize([0.5]*3,[0.5]*3)])
-    transform_hr = transforms.Compose([transforms.Resize((256,256)), transforms.ToTensor(), transforms.Normalize([0.5]*3,[0.5]*3)])
+    transform_lr = transforms.Compose([
+        transforms.Resize((64,64)), transforms.ToTensor(),
+        transforms.Normalize([0.5]*3, [0.5]*3)
+    ])
+    transform_hr = transforms.Compose([
+        transforms.Resize((256,256)), transforms.ToTensor(),
+        transforms.Normalize([0.5]*3, [0.5]*3)
+    ])
 
-    train_dataset = ImagePairZipDataset("datasets/64with10k.zip", "datasets/hr256with10k.zip", transform_hr=transform_hr, transform_lr=transform_lr)
-    train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True, num_workers=0)
+    dataset = ImagePairZipDataset(
+        "datasets/hr256with10k.zip",
+        "datasets/64with10k.zip",
+        transform_hr=transform_hr, transform_lr=transform_lr
+    )
+    loader = DataLoader(dataset, batch_size=2, shuffle=True, num_workers=0, pin_memory=True)
 
-    G = Generator().to(device)
-    D = Discriminator().to(device)
+    G, D = Generator().to(device), Discriminator().to(device)
+    print("Generator Summary:"); summary(G, input_size=(1,3,64,64), device=device)
+    print("Discriminator Summary:"); summary(D, input_size=(1,3,256,256), device=device)
 
-    print("Generator Summary:")
-    summary(G, input_size=(1,3,64,64), device=device)
-    print("Discriminator Summary:")
-    summary(D, input_size=(1,3,256,256), device=device)
+    trainer = AdversarialTraining(G,D,device)
+    g_opt = optim.Adam(G.parameters(), lr=1e-4, betas=(0.0,0.99))
+    d_opt = optim.Adam(D.parameters(), lr=1e-4, betas=(0.0,0.99))
+    g_sched = optim.lr_scheduler.StepLR(g_opt, step_size=1000, gamma=0.5)
+    d_sched = optim.lr_scheduler.StepLR(d_opt, step_size=1000, gamma=0.5)
 
-    trainer = AdversarialTraining(G, D, device)
-    g_optim = optim.Adam(G.parameters(), lr=1e-4, betas=(0,0.99))
-    d_optim = optim.Adam(D.parameters(), lr=1e-4, betas=(0,0.99))
-    g_scheduler = optim.lr_scheduler.StepLR(g_optim, step_size=1000, gamma=0.5)
-    d_scheduler = optim.lr_scheduler.StepLR(d_optim, step_size=1000, gamma=0.5)
-
-    step = 0
-    best_fid = float("inf")
-    epochs = 10
-
+    step, best_fid, epochs = 0, float("inf"), 10
     for epoch in range(epochs):
-        for lr_imgs, hr_imgs in tqdm(train_loader, ncols=120):
+        for lr_imgs, hr_imgs in tqdm(loader, ncols=120):
             lr_imgs, hr_imgs = lr_imgs.to(device), hr_imgs.to(device)
+            d_opt.zero_grad()
+            d_loss, d_total, r1, r2 = trainer.DiscriminatorLoss(lr_imgs, hr_imgs)
+            d_total.backward(); d_opt.step()
+            g_opt.zero_grad()
+            g_loss, fake = trainer.GeneratorLoss(lr_imgs, hr_imgs)
+            g_loss.backward(); g_opt.step()
+            g_sched.step(); d_sched.step(); step += 1
 
-            d_optim.zero_grad()
-            trainer.AccumulateDiscriminatorGradients(lr_imgs, hr_imgs)
-            d_optim.step()
-
-            g_optim.zero_grad()
-            trainer.AccumulateGeneratorGradients(lr_imgs)
-            g_optim.step()
-
-            g_scheduler.step()
-            d_scheduler.step()
-            step += 1
-
-            if step % 500 == 0:
-                with torch.no_grad():
-                    fake = G(lr_imgs[:1])
-                    save_with_labels([lr_imgs[0].cpu(), fake[0].cpu(), hr_imgs[0].cpu()],
-                                     ["LR","Fake","HR"], f"{save_dir}/step{step}.png")
-
-            if step % 2000 == 0 and step > 0:
-                fid = evaluate_fid(G, train_loader, device, step)
+            if step % 50 == 0:
+                save_with_labels([lr_imgs[0], fake[0], hr_imgs[0]],
+                                 ["LR","SR","HR"], f"{save_dir}/step_{step:06d}.png")
+                print(f"Step {step:06d} | G:{g_loss.item():.4f} | D:{d_loss.item():.4f} | R1:{r1.item():.4f} | R2:{r2.item():.4f}")
+            if step % 300 == 0:
+                fid = evaluate_fid(G, loader, device, step)
                 if fid < best_fid:
                     best_fid = fid
-                    torch.save(G.state_dict(), os.path.join(save_dir,"best_generator.pth"))
+                    torch.save(G.state_dict(), os.path.join(save_dir, "best_generator.pth"))
+                    print(f">> New best FID: {fid:.2f} at step {step}")
 
-    print("=== Training Finished ===")
+    torch.save(G.state_dict(), os.path.join(save_dir, "final_generator.pth"))
+    torch.save(D.state_dict(), os.path.join(save_dir, "final_discriminator.pth"))
+    print(">> Training complete.")
 
 if __name__ == "__main__":
     main()
