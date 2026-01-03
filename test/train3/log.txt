@@ -1,0 +1,393 @@
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─SelfAttention: 3-2                               [1, 64, 64, 64]           5,201
+│    │    └─ModuleList: 3-3                                  --                        107,648
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+>> Starting training from epoch 0, step 0
+Step 000500 | G:0.8088 | D:0.6543 | R1:0.0000 | R2:0.0000
+Step 001000 | G:3.9502 | D:0.3668 | R1:0.0004 | R2:0.0002
+Step 1000: FID = 219.44
+>> New best FID: 219.44 at step 1000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 1000
+Step 001500 | G:0.7690 | D:0.7212 | R1:0.0014 | R2:0.0008
+Step 002000 | G:0.7853 | D:0.6595 | R1:0.0009 | R2:0.0009
+>> Checkpoint saved at step 2000
+Step 2000: FID = 171.68
+>> New best FID: 171.68 at step 2000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 2000
+Step 002500 | G:0.7603 | D:0.6630 | R1:0.0005 | R2:0.0004
+Step 003000 | G:0.7426 | D:0.6677 | R1:0.0013 | R2:0.0012
+Step 3000: FID = 109.94
+>> New best FID: 109.94 at step 3000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 3000
+Step 003500 | G:0.7370 | D:0.7652 | R1:0.0005 | R2:0.0006
+Step 004000 | G:0.7009 | D:0.7065 | R1:0.0001 | R2:0.0001
+>> Checkpoint saved at step 4000
+Step 4000: FID = 92.32
+>> New best FID: 92.32 at step 4000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 4000
+Step 004500 | G:0.7246 | D:0.7206 | R1:0.0012 | R2:0.0022
+Step 005000 | G:0.7446 | D:0.6689 | R1:0.0009 | R2:0.0008
+Step 5000: FID = 75.57
+>> New best FID: 75.57 at step 5000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 5000
+Step 005500 | G:0.8008 | D:0.6721 | R1:0.0023 | R2:0.0024
+Step 006000 | G:0.7367 | D:0.6741 | R1:0.0021 | R2:0.0019
+>> Checkpoint saved at step 6000
+Step 6000: FID = 65.47
+>> New best FID: 65.47 at step 6000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 6000
+Step 006500 | G:0.8067 | D:0.6559 | R1:0.0020 | R2:0.0019
+Step 007000 | G:0.7802 | D:0.6496 | R1:0.0015 | R2:0.0013
+Step 7000: FID = 55.00
+>> New best FID: 55.00 at step 7000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 7000
+Step 007500 | G:0.7533 | D:0.6732 | R1:0.0015 | R2:0.0015
+Step 008000 | G:0.7596 | D:0.6589 | R1:0.0015 | R2:0.0014
+>> Checkpoint saved at step 8000
+Step 8000: FID = 47.20
+>> New best FID: 47.20 at step 8000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 8000
+Step 008500 | G:0.7739 | D:0.6699 | R1:0.0013 | R2:0.0011
+Step 009000 | G:0.7435 | D:0.6698 | R1:0.0012 | R2:0.0013
+Step 9000: FID = 39.10
+>> New best FID: 39.10 at step 9000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 9000
+Step 009500 | G:0.7427 | D:0.6706 | R1:0.0012 | R2:0.0012
+Step 010000 | G:0.7584 | D:0.6530 | R1:0.0014 | R2:0.0015
+>> Checkpoint saved at step 10000
+Step 10000: FID = 32.29
+>> New best FID: 32.29 at step 10000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 10000
+Step 010500 | G:0.7395 | D:0.6766 | R1:0.0015 | R2:0.0015
+Step 011000 | G:0.7593 | D:0.6629 | R1:0.0016 | R2:0.0016
+Step 11000: FID = 27.67
+>> New best FID: 27.67 at step 11000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 11000
+Step 011500 | G:0.7649 | D:0.6680 | R1:0.0010 | R2:0.0010
+Step 012000 | G:0.7493 | D:0.6718 | R1:0.0014 | R2:0.0013
+>> Checkpoint saved at step 12000
+Step 12000: FID = 24.48
+>> New best FID: 24.48 at step 12000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 12000
+Step 012500 | G:0.7358 | D:0.6774 | R1:0.0013 | R2:0.0014
+Step 013000 | G:0.7527 | D:0.6739 | R1:0.0016 | R2:0.0015
+Step 13000: FID = 22.03
+>> New best FID: 22.03 at step 13000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 13000
+Step 013500 | G:0.7110 | D:0.6841 | R1:0.0004 | R2:0.0004
+Step 014000 | G:0.7625 | D:0.6577 | R1:0.0012 | R2:0.0013
+>> Checkpoint saved at step 14000
+Step 14000: FID = 20.54
+>> New best FID: 20.54 at step 14000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 14000
+Step 014500 | G:0.8490 | D:0.6576 | R1:0.0012 | R2:0.0011
+Step 015000 | G:0.7635 | D:0.6573 | R1:0.0013 | R2:0.0012
+Step 15000: FID = 19.05
+>> New best FID: 19.05 at step 15000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 15000
+Step 015500 | G:0.7598 | D:0.6485 | R1:0.0013 | R2:0.0012
+Step 016000 | G:0.7465 | D:0.6678 | R1:0.0013 | R2:0.0013
+>> Checkpoint saved at step 16000
+Step 16000: FID = 18.00
+>> New best FID: 18.00 at step 16000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 16000
+Step 016500 | G:0.7419 | D:0.6723 | R1:0.0013 | R2:0.0013
+Step 017000 | G:0.7452 | D:0.6761 | R1:0.0014 | R2:0.0011
+Step 17000: FID = 17.32
+>> New best FID: 17.32 at step 17000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 17000
+Step 017500 | G:0.7057 | D:0.6849 | R1:0.0003 | R2:0.0003
+Step 018000 | G:0.7326 | D:0.6786 | R1:0.0015 | R2:0.0014
+>> Checkpoint saved at step 18000
+Step 18000: FID = 16.21
+>> New best FID: 16.21 at step 18000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 18000
+Step 018500 | G:0.7562 | D:0.6581 | R1:0.0012 | R2:0.0011
+Step 019000 | G:0.7423 | D:0.6918 | R1:0.0010 | R2:0.0009
+Step 19000: FID = 15.70
+>> New best FID: 15.70 at step 19000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 19000
+Step 019500 | G:0.7789 | D:0.6613 | R1:0.0015 | R2:0.0014
+Step 020000 | G:0.7377 | D:0.6696 | R1:0.0011 | R2:0.0011
+>> Checkpoint saved at step 20000
+Step 20000: FID = 15.23
+>> New best FID: 15.23 at step 20000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 20000
+Step 020500 | G:0.7647 | D:0.6567 | R1:0.0013 | R2:0.0013
+Step 021000 | G:0.7604 | D:0.6673 | R1:0.0015 | R2:0.0015
+Step 21000: FID = 14.96
+>> New best FID: 14.96 at step 21000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 21000
+Step 021500 | G:0.7598 | D:0.6516 | R1:0.0015 | R2:0.0014
+Step 022000 | G:0.7697 | D:0.6548 | R1:0.0015 | R2:0.0014
+>> Checkpoint saved at step 22000
+Step 22000: FID = 14.62
+>> New best FID: 14.62 at step 22000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 22000
+Step 022500 | G:0.7351 | D:0.6691 | R1:0.0014 | R2:0.0012
+Step 023000 | G:0.7700 | D:0.6538 | R1:0.0015 | R2:0.0012
+Step 23000: FID = 14.34
+>> New best FID: 14.34 at step 23000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 23000
+Step 023500 | G:0.7517 | D:0.6570 | R1:0.0016 | R2:0.0015
+Step 024000 | G:0.7444 | D:0.6672 | R1:0.0014 | R2:0.0014
+>> Checkpoint saved at step 24000
+Step 24000: FID = 13.97
+>> New best FID: 13.97 at step 24000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 24000
+Step 024500 | G:0.7560 | D:0.6579 | R1:0.0016 | R2:0.0015
+Step 025000 | G:0.7617 | D:0.6669 | R1:0.0015 | R2:0.0013
+Step 25000: FID = 13.74
+>> New best FID: 13.74 at step 25000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 25000
+Step 025500 | G:0.7576 | D:0.6537 | R1:0.0018 | R2:0.0016
+Step 026000 | G:0.7557 | D:0.6623 | R1:0.0015 | R2:0.0015
+>> Checkpoint saved at step 26000
+Step 26000: FID = 13.38
+>> New best FID: 13.38 at step 26000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 26000
+Step 026500 | G:0.7602 | D:0.6556 | R1:0.0015 | R2:0.0014
+Step 027000 | G:0.7585 | D:0.6607 | R1:0.0014 | R2:0.0013
+Step 27000: FID = 13.00
+>> New best FID: 13.00 at step 27000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 27000
+Step 027500 | G:0.7509 | D:0.6565 | R1:0.0018 | R2:0.0017
+Step 028000 | G:0.7527 | D:0.6573 | R1:0.0014 | R2:0.0014
+>> Checkpoint saved at step 28000
+Step 28000: FID = 12.83
+>> New best FID: 12.83 at step 28000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 28000
+Step 028500 | G:0.7642 | D:0.6576 | R1:0.0015 | R2:0.0017
+Step 029000 | G:0.7471 | D:0.6614 | R1:0.0015 | R2:0.0014
+Step 29000: FID = 12.77
+>> New best FID: 12.77 at step 29000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 29000
+Step 029500 | G:0.7533 | D:0.6572 | R1:0.0018 | R2:0.0015
+Step 030000 | G:0.7413 | D:0.6687 | R1:0.0016 | R2:0.0016
+>> Checkpoint saved at step 30000
+Step 30000: FID = 12.57
+>> New best FID: 12.57 at step 30000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 30000
+Step 030500 | G:0.7785 | D:0.6453 | R1:0.0017 | R2:0.0016
+Step 031000 | G:0.7423 | D:0.6666 | R1:0.0016 | R2:0.0015
+Step 31000: FID = 12.35
+>> New best FID: 12.35 at step 31000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 31000
+Step 031500 | G:0.7495 | D:0.6562 | R1:0.0014 | R2:0.0014
+Step 032000 | G:0.7570 | D:0.6554 | R1:0.0017 | R2:0.0015
+>> Checkpoint saved at step 32000
+Step 32000: FID = 12.15
+>> New best FID: 12.15 at step 32000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 32000
+Step 032500 | G:0.7660 | D:0.6597 | R1:0.0016 | R2:0.0017
+Step 033000 | G:0.7545 | D:0.6527 | R1:0.0014 | R2:0.0013
+Step 33000: FID = 12.03
+>> New best FID: 12.03 at step 33000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 33000
+Step 033500 | G:0.7407 | D:0.6659 | R1:0.0014 | R2:0.0012
+Step 034000 | G:0.7568 | D:0.6584 | R1:0.0018 | R2:0.0015
+>> Checkpoint saved at step 34000
+Step 34000: FID = 11.77
+>> New best FID: 11.77 at step 34000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 34000
+Step 034500 | G:0.7495 | D:0.6591 | R1:0.0017 | R2:0.0016
+Step 035000 | G:0.7693 | D:0.6485 | R1:0.0016 | R2:0.0013
+Step 35000: FID = 11.56
+>> New best FID: 11.56 at step 35000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 35000
+Step 035500 | G:0.7507 | D:0.6708 | R1:0.0016 | R2:0.0015
+Step 036000 | G:0.8116 | D:0.6425 | R1:0.0021 | R2:0.0015
+>> Checkpoint saved at step 36000
+Step 36000: FID = 11.38
+>> New best FID: 11.38 at step 36000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 36000
+Step 036500 | G:0.7415 | D:0.6675 | R1:0.0015 | R2:0.0016
+Step 037000 | G:0.7622 | D:0.6518 | R1:0.0019 | R2:0.0018
+Step 37000: FID = 11.28
+>> New best FID: 11.28 at step 37000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 37000
+Step 037500 | G:0.7481 | D:0.6611 | R1:0.0017 | R2:0.0015
+Step 038000 | G:0.7529 | D:0.6575 | R1:0.0014 | R2:0.0014
+>> Checkpoint saved at step 38000
+Step 38000: FID = 11.12
+>> New best FID: 11.12 at step 38000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 38000
+Step 038500 | G:0.7497 | D:0.6540 | R1:0.0017 | R2:0.0017
+Step 039000 | G:0.7509 | D:0.6571 | R1:0.0017 | R2:0.0016
+Step 39000: FID = 11.13
+Step 039500 | G:0.7781 | D:0.6398 | R1:0.0020 | R2:0.0018
+Step 040000 | G:0.9154 | D:0.6131 | R1:0.0040 | R2:0.0021
+>> Checkpoint saved at step 40000
+Step 40000: FID = 11.04
+>> New best FID: 11.04 at step 40000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 40000
+Step 040500 | G:0.7394 | D:0.6660 | R1:0.0017 | R2:0.0017
+Step 041000 | G:0.7552 | D:0.6554 | R1:0.0016 | R2:0.0015
+Step 41000: FID = 11.01
+>> New best FID: 11.01 at step 41000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 41000
+Step 041500 | G:0.7560 | D:0.6632 | R1:0.0017 | R2:0.0017
+Step 042000 | G:0.7556 | D:0.6570 | R1:0.0018 | R2:0.0015
+>> Checkpoint saved at step 42000
+Step 42000: FID = 10.95
+>> New best FID: 10.95 at step 42000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 42000
+Step 042500 | G:0.7398 | D:0.6641 | R1:0.0017 | R2:0.0018
+Step 043000 | G:0.7429 | D:0.6636 | R1:0.0017 | R2:0.0014
+Step 43000: FID = 10.76
+>> New best FID: 10.76 at step 43000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 43000
+Step 043500 | G:0.7544 | D:0.6651 | R1:0.0020 | R2:0.0020
+Step 044000 | G:0.7513 | D:0.6571 | R1:0.0019 | R2:0.0017
+>> Checkpoint saved at step 44000
+Step 44000: FID = 10.74
+>> New best FID: 10.74 at step 44000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 44000
+Step 044500 | G:0.8267 | D:0.6224 | R1:0.0020 | R2:0.0017
+Step 045000 | G:0.7654 | D:0.6507 | R1:0.0019 | R2:0.0019
+Step 45000: FID = 10.73
+>> New best FID: 10.73 at step 45000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 45000
+Step 045500 | G:0.7639 | D:0.6755 | R1:0.0019 | R2:0.0021
+Step 046000 | G:0.7709 | D:0.6444 | R1:0.0019 | R2:0.0019
+>> Checkpoint saved at step 46000
+Step 46000: FID = 10.73
+>> New best FID: 10.73 at step 46000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 46000
+Step 046500 | G:0.7584 | D:0.6448 | R1:0.0020 | R2:0.0018
+Step 047000 | G:0.7852 | D:0.6395 | R1:0.0022 | R2:0.0020
+Step 47000: FID = 10.71
+>> New best FID: 10.71 at step 47000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 47000
+Step 047500 | G:0.7509 | D:0.6532 | R1:0.0018 | R2:0.0017
+Step 048000 | G:0.7489 | D:0.6599 | R1:0.0018 | R2:0.0019
+>> Checkpoint saved at step 48000
+Step 48000: FID = 10.68
+>> New best FID: 10.68 at step 48000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 48000
+Step 048500 | G:0.7522 | D:0.6562 | R1:0.0020 | R2:0.0019
+Step 049000 | G:0.7490 | D:0.6562 | R1:0.0018 | R2:0.0017
+Step 49000: FID = 10.60
+>> New best FID: 10.60 at step 49000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 49000
+Step 049500 | G:0.7453 | D:0.6607 | R1:0.0020 | R2:0.0019
+Step 050000 | G:0.7724 | D:0.6410 | R1:0.0020 | R2:0.0019
+>> Checkpoint saved at step 50000
+Step 50000: FID = 10.55
+>> New best FID: 10.55 at step 50000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 50000
+Step 050500 | G:0.7537 | D:0.6573 | R1:0.0019 | R2:0.0018
+Step 051000 | G:0.7472 | D:0.6663 | R1:0.0019 | R2:0.0018
+Step 51000: FID = 10.50
+>> New best FID: 10.50 at step 51000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 51000
+Step 051500 | G:0.7623 | D:0.6564 | R1:0.0019 | R2:0.0020
+Step 052000 | G:0.7364 | D:0.6659 | R1:0.0019 | R2:0.0018
+>> Checkpoint saved at step 52000
+Step 52000: FID = 10.47
+>> New best FID: 10.47 at step 52000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 52000
+Step 052500 | G:0.7423 | D:0.6608 | R1:0.0018 | R2:0.0017
+Step 053000 | G:0.8105 | D:0.6350 | R1:0.0025 | R2:0.0021
+Step 53000: FID = 10.48
+Step 053500 | G:0.7519 | D:0.6546 | R1:0.0018 | R2:0.0018
+Step 054000 | G:0.7542 | D:0.6524 | R1:0.0020 | R2:0.0018
+>> Checkpoint saved at step 54000
+Step 54000: FID = 10.48
+Step 054500 | G:0.7369 | D:0.6634 | R1:0.0017 | R2:0.0018
+Step 055000 | G:0.7446 | D:0.6540 | R1:0.0019 | R2:0.0017
+Step 55000: FID = 10.39
+>> New best FID: 10.39 at step 55000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 55000
+Step 055500 | G:0.8764 | D:0.5938 | R1:0.0039 | R2:0.0017
+Step 056000 | G:0.7488 | D:0.6615 | R1:0.0019 | R2:0.0020
+>> Checkpoint saved at step 56000
+Step 56000: FID = 10.41
+Step 056500 | G:0.7656 | D:0.6457 | R1:0.0018 | R2:0.0019
+Step 057000 | G:0.7451 | D:0.6600 | R1:0.0019 | R2:0.0018
+Step 57000: FID = 10.35
+>> New best FID: 10.35 at step 57000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 57000
+Step 057500 | G:0.7689 | D:0.6425 | R1:0.0022 | R2:0.0017
+Step 058000 | G:0.7506 | D:0.6518 | R1:0.0020 | R2:0.0020
+>> Checkpoint saved at step 58000
+Step 58000: FID = 10.41
+Step 058500 | G:0.7354 | D:0.6670 | R1:0.0016 | R2:0.0018
+Step 059000 | G:0.7668 | D:0.6479 | R1:0.0025 | R2:0.0024
+Step 59000: FID = 10.32
+>> New best FID: 10.32 at step 59000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 59000
+Step 059500 | G:0.7837 | D:0.6340 | R1:0.0022 | R2:0.0019
+Step 060000 | G:0.7377 | D:0.6621 | R1:0.0018 | R2:0.0016
+>> Checkpoint saved at step 60000
+Step 60000: FID = 10.28
+>> New best FID: 10.28 at step 60000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 60000
+Step 060500 | G:0.7294 | D:0.6669 | R1:0.0015 | R2:0.0015
+Step 061000 | G:0.7363 | D:0.6637 | R1:0.0018 | R2:0.0018
+Step 61000: FID = 10.23
+>> New best FID: 10.23 at step 61000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 61000
+Step 061500 | G:0.7553 | D:0.6526 | R1:0.0018 | R2:0.0018
+Step 062000 | G:0.7771 | D:0.6433 | R1:0.0029 | R2:0.0017
+>> Checkpoint saved at step 62000
+Step 62000: FID = 10.23
+Step 062500 | G:0.7408 | D:0.6705 | R1:0.0019 | R2:0.0022
+>> Checkpoint saved at step 62500
+>> Training complete.

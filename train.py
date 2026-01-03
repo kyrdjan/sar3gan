@@ -217,6 +217,28 @@ def main(**kwargs):
         c.total_kimg = decay_nimg // 1000
 
 
+    if opts.preset == 'LIGHTWEIGHT':
+        # -----------------------------
+        # Lightweight architecture
+        # -----------------------------
+        WidthPerStage       = [64, 128, 128]   # small feature widths
+        BlocksPerStage      = [1, 1, 1]        # fewer residual blocks
+        CardinalityPerStage = [4, 4, 4]        # smaller grouped convolutions
+        FP16Stages          = []               # no FP16 stages
+
+        # Training schedule (shorter for testing / lightweight)
+        dataset_size   = 10_000
+        target_epochs  = 10
+        decay_nimg     = dataset_size * target_epochs   # total images
+        ema_nimg       = dataset_size * 2               # EMA ramp in
+
+        c.ema_scheduler   = { 'base_value': 0, 'final_value': ema_nimg, 'total_nimg': decay_nimg }
+        c.aug_scheduler   = { 'base_value': 0, 'final_value': 0.1, 'total_nimg': decay_nimg }
+        c.lr_scheduler    = { 'base_value': 1e-4, 'final_value': 2e-5, 'total_nimg': decay_nimg }
+        c.gamma_scheduler = { 'base_value': 10.0, 'final_value': 1.0, 'total_nimg': decay_nimg }
+        c.beta2_scheduler = { 'base_value': 0.9, 'final_value': 0.99, 'total_nimg': decay_nimg }
+
+        c.total_kimg = decay_nimg // 1000
 
     # if opts.preset == 'TEST-256':
     # # Core architecture settings (256×256, no conditional)

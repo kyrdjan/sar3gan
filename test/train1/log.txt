@@ -1,0 +1,820 @@
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─ModuleList: 3-2                                  --                        107,648
+│    │    └─SelfAttention: 3-3                               [1, 64, 64, 64]           5,201
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+>> Starting training from epoch 0, step 0
+Step 000500 | G:0.6956 | D:0.7593 | R1:0.0000 | R2:0.0000
+Step 001000 | G:0.7841 | D:0.6643 | R1:0.0009 | R2:0.0008
+Step 1000: FID = 126.07
+>> New best FID: 126.07 at step 1000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 1000
+Step 001500 | G:0.7277 | D:0.6811 | R1:0.0001 | R2:0.0001
+Step 002000 | G:0.7055 | D:0.6875 | R1:0.0000 | R2:0.0000
+>> Checkpoint saved at step 2000
+Step 2000: FID = 66.12
+>> New best FID: 66.12 at step 2000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 2000
+Step 002500 | G:0.7036 | D:0.7020 | R1:0.0001 | R2:0.0000
+Step 003000 | G:0.7261 | D:0.6931 | R1:0.0002 | R2:0.0002
+Step 3000: FID = 65.24
+>> New best FID: 65.24 at step 3000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 3000
+Step 003500 | G:0.7453 | D:0.6881 | R1:0.0006 | R2:0.0005
+Step 004000 | G:0.7332 | D:0.6930 | R1:0.0012 | R2:0.0012
+>> Checkpoint saved at step 4000
+Step 4000: FID = 58.04
+>> New best FID: 58.04 at step 4000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 4000
+Step 004500 | G:0.8013 | D:0.6630 | R1:0.0009 | R2:0.0007
+Step 005000 | G:0.7536 | D:0.6771 | R1:0.0009 | R2:0.0008
+Step 5000: FID = 49.47
+>> New best FID: 49.47 at step 5000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 5000
+Step 005500 | G:0.7384 | D:0.6730 | R1:0.0012 | R2:0.0011
+Step 006000 | G:0.7374 | D:0.6741 | R1:0.0011 | R2:0.0010
+>> Checkpoint saved at step 6000
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─ModuleList: 3-2                                  --                        107,648
+│    │    └─SelfAttention: 3-3                               [1, 64, 64, 64]           5,201
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+Loading checkpoint from training_snapshots_64to256/checkpoint_step_6000.pth...
+>> Resumed from step 6000, epoch 4, best FID: 49.47
+>> Starting training from epoch 4, step 6000
+Step 006500 | G:0.7499 | D:0.6662 | R1:0.0012 | R2:0.0012
+Step 007000 | G:0.7440 | D:0.6720 | R1:0.0012 | R2:0.0012
+Step 7000: FID = 37.70
+>> New best FID: 37.70 at step 7000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 7000
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─ModuleList: 3-2                                  --                        107,648
+│    │    └─SelfAttention: 3-3                               [1, 64, 64, 64]           5,201
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+Loading checkpoint from training_snapshots_64to256/best_sample_at_step_007000.pth...
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─ModuleList: 3-2                                  --                        107,648
+│    │    └─SelfAttention: 3-3                               [1, 64, 64, 64]           5,201
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+Loading checkpoint from training_snapshots_64to256/best_sample_at_step_7000.pth...
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─ModuleList: 3-2                                  --                        107,648
+│    │    └─SelfAttention: 3-3                               [1, 64, 64, 64]           5,201
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+Loading checkpoint from training_snapshots_64to256/checkpoint_step_7000.pth...
+>> Resumed from step 7000, epoch 5, best FID: 37.70
+>> Starting training from epoch 5, step 7000
+Step 007500 | G:0.7980 | D:0.6545 | R1:0.0013 | R2:0.0012
+Step 008000 | G:0.7650 | D:0.6693 | R1:0.0013 | R2:0.0012
+>> Checkpoint saved at step 8000
+Step 8000: FID = 32.98
+>> New best FID: 32.98 at step 8000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 8000
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─ModuleList: 3-2                                  --                        107,648
+│    │    └─SelfAttention: 3-3                               [1, 64, 64, 64]           5,201
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+Loading checkpoint from training_snapshots_64to256/checkpoint_step_8000.pth...
+>> Resumed from step 8000, epoch 6, best FID: 32.98
+>> Starting training from epoch 6, step 8000
+Step 008500 | G:0.7608 | D:0.6616 | R1:0.0013 | R2:0.0013
+Step 009000 | G:0.7420 | D:0.6880 | R1:0.0015 | R2:0.0015
+Step 9000: FID = 28.14
+>> New best FID: 28.14 at step 9000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 9000
+Step 009500 | G:0.7455 | D:0.6984 | R1:0.0015 | R2:0.0016
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─ModuleList: 3-2                                  --                        107,648
+│    │    └─SelfAttention: 3-3                               [1, 64, 64, 64]           5,201
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+Loading checkpoint from training_snapshots_64to256/checkpoint_step_9000.pth...
+>> Resumed from step 9000, epoch 7, best FID: 28.14
+>> Starting training from epoch 7, step 9000
+Step 009500 | G:0.7470 | D:0.6736 | R1:0.0012 | R2:0.0013
+Step 010000 | G:0.7566 | D:0.6605 | R1:0.0013 | R2:0.0013
+>> Checkpoint saved at step 10000
+Step 10000: FID = 24.81
+>> New best FID: 24.81 at step 10000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 10000
+Step 010500 | G:0.7589 | D:0.6915 | R1:0.0012 | R2:0.0013
+Step 011000 | G:0.7714 | D:0.6533 | R1:0.0015 | R2:0.0014
+Step 11000: FID = 22.56
+>> New best FID: 22.56 at step 11000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 11000
+Generator Summary:
+Setting up PyTorch plugin "upfirdn2d_plugin"... Done.
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Generator                                                    [1, 3, 256, 256]          --
+├─ModuleList: 1-1                                            --                        --
+│    └─GeneratorStage: 2-1                                   [1, 64, 64, 64]           --
+│    │    └─Convolution: 3-1                                 [1, 64, 64, 64]           1,792
+│    │    └─ModuleList: 3-2                                  --                        107,648
+│    │    └─SelfAttention: 3-3                               [1, 64, 64, 64]           5,201
+│    └─GeneratorStage: 2-2                                   [1, 128, 128, 128]        20,641
+│    │    └─UpsampleLayer: 3-4                               [1, 128, 128, 128]        8,320
+│    │    └─ModuleList: 3-5                                  --                        428,288
+│    └─GeneratorStage: 2-3                                   [1, 256, 256, 256]        82,241
+│    │    └─UpsampleLayer: 3-6                               [1, 256, 256, 256]        33,024
+│    │    └─ModuleList: 3-7                                  --                        1,708,544
+├─Convolution: 1-2                                           [1, 3, 256, 256]          --
+│    └─Conv2d: 2-4                                           [1, 3, 256, 256]          771
+==============================================================================================================
+Total params: 2,396,470
+Trainable params: 2,396,470
+Non-trainable params: 0
+Total mult-adds (G): 121.66
+==============================================================================================================
+Input size (MB): 0.05
+Forward/backward pass size (MB): 2912.94
+Params size (MB): 9.17
+Estimated Total Size (MB): 2922.17
+==============================================================================================================
+Discriminator Summary:
+==============================================================================================================
+Layer (type:depth-idx)                                       Output Shape              Param #
+==============================================================================================================
+Discriminator                                                [1]                       --
+├─Convolution: 1-1                                           [1, 64, 256, 256]         --
+│    └─Conv2d: 2-1                                           [1, 64, 256, 256]         256
+├─ModuleList: 1-2                                            --                        --
+│    └─DiscriminatorStage: 2-2                               [1, 128, 128, 128]        5,201
+│    │    └─ModuleList: 3-1                                  --                        107,648
+│    │    └─DownsampleLayer: 3-2                             [1, 128, 128, 128]        8,320
+│    └─DiscriminatorStage: 2-3                               [1, 256, 64, 64]          20,641
+│    │    └─ModuleList: 3-3                                  --                        428,288
+│    │    └─DownsampleLayer: 3-4                             [1, 256, 64, 64]          33,024
+│    └─DiscriminatorStage: 2-4                               [1, 1]                    --
+│    │    └─SelfAttention: 3-5                               [1, 256, 64, 64]          82,241
+│    │    └─ModuleList: 3-6                                  --                        1,708,544
+│    │    └─AdaptiveAvgPool2d: 3-7                           [1, 256, 1, 1]            --
+│    │    └─Linear: 3-8                                      [1, 1]                    256
+==============================================================================================================
+Total params: 2,394,419
+Trainable params: 2,394,419
+Non-trainable params: 0
+Total mult-adds (G): 21.64
+==============================================================================================================
+Input size (MB): 0.79
+Forward/backward pass size (MB): 1126.17
+Params size (MB): 9.47
+Estimated Total Size (MB): 1136.43
+==============================================================================================================
+Loading checkpoint from training_snapshots_64to256/checkpoint_step_11000.pth...
+>> Resumed from step 11000, epoch 8, best FID: 22.56
+>> Starting training from epoch 8, step 11000
+Step 011500 | G:0.7408 | D:0.6696 | R1:0.0012 | R2:0.0012
+Step 012000 | G:0.7827 | D:0.6525 | R1:0.0014 | R2:0.0013
+>> Checkpoint saved at step 12000
+Step 12000: FID = 20.62
+>> New best FID: 20.62 at step 12000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 12000
+Step 012500 | G:0.7631 | D:0.6708 | R1:0.0016 | R2:0.0015
+Step 013000 | G:0.7471 | D:0.6602 | R1:0.0014 | R2:0.0014
+Step 13000: FID = 19.03
+>> New best FID: 19.03 at step 13000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 13000
+Step 013500 | G:0.7931 | D:0.6642 | R1:0.0015 | R2:0.0013
+Step 014000 | G:0.7286 | D:0.6740 | R1:0.0008 | R2:0.0007
+>> Checkpoint saved at step 14000
+Step 14000: FID = 18.09
+>> New best FID: 18.09 at step 14000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 14000
+Step 014500 | G:0.7362 | D:0.6704 | R1:0.0012 | R2:0.0011
+Step 015000 | G:0.7577 | D:0.6670 | R1:0.0013 | R2:0.0013
+Step 15000: FID = 17.01
+>> New best FID: 17.01 at step 15000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 15000
+Step 015500 | G:0.7816 | D:0.6753 | R1:0.0014 | R2:0.0015
+Step 016000 | G:0.7461 | D:0.6664 | R1:0.0014 | R2:0.0014
+>> Checkpoint saved at step 16000
+Step 16000: FID = 16.29
+>> New best FID: 16.29 at step 16000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 16000
+Step 016500 | G:0.7623 | D:0.6573 | R1:0.0015 | R2:0.0016
+Step 017000 | G:0.7447 | D:0.6777 | R1:0.0014 | R2:0.0016
+Step 17000: FID = 15.55
+>> New best FID: 15.55 at step 17000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 17000
+Step 017500 | G:0.7489 | D:0.6710 | R1:0.0015 | R2:0.0014
+Step 018000 | G:0.7431 | D:0.6643 | R1:0.0012 | R2:0.0012
+>> Checkpoint saved at step 18000
+Step 18000: FID = 14.98
+>> New best FID: 14.98 at step 18000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 18000
+Step 018500 | G:0.7696 | D:0.6583 | R1:0.0015 | R2:0.0012
+Step 019000 | G:0.7303 | D:0.6711 | R1:0.0012 | R2:0.0013
+Step 19000: FID = 14.32
+>> New best FID: 14.32 at step 19000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 19000
+Step 019500 | G:0.7530 | D:0.6748 | R1:0.0015 | R2:0.0018
+Step 020000 | G:0.7928 | D:0.6407 | R1:0.0015 | R2:0.0013
+>> Checkpoint saved at step 20000
+Step 20000: FID = 13.85
+>> New best FID: 13.85 at step 20000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 20000
+Step 020500 | G:0.7480 | D:0.6636 | R1:0.0014 | R2:0.0014
+Step 021000 | G:0.7571 | D:0.6596 | R1:0.0014 | R2:0.0013
+Step 21000: FID = 13.28
+>> New best FID: 13.28 at step 21000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 21000
+Step 021500 | G:0.7555 | D:0.6739 | R1:0.0012 | R2:0.0013
+Step 022000 | G:0.7436 | D:0.6721 | R1:0.0014 | R2:0.0014
+>> Checkpoint saved at step 22000
+Step 22000: FID = 12.82
+>> New best FID: 12.82 at step 22000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 22000
+Step 022500 | G:0.7318 | D:0.6843 | R1:0.0012 | R2:0.0012
+Step 023000 | G:0.7587 | D:0.6720 | R1:0.0013 | R2:0.0013
+Step 23000: FID = 12.44
+>> New best FID: 12.44 at step 23000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 23000
+Step 023500 | G:0.7882 | D:0.6554 | R1:0.0014 | R2:0.0013
+Step 024000 | G:0.7437 | D:0.6790 | R1:0.0015 | R2:0.0014
+>> Checkpoint saved at step 24000
+Step 24000: FID = 12.13
+>> New best FID: 12.13 at step 24000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 24000
+Step 024500 | G:0.7284 | D:0.6789 | R1:0.0012 | R2:0.0012
+Step 025000 | G:0.7529 | D:0.6819 | R1:0.0018 | R2:0.0020
+Step 25000: FID = 11.83
+>> New best FID: 11.83 at step 25000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 25000
+Step 025500 | G:0.7384 | D:0.6726 | R1:0.0013 | R2:0.0011
+Step 026000 | G:0.8070 | D:0.6484 | R1:0.0016 | R2:0.0013
+>> Checkpoint saved at step 26000
+Step 26000: FID = 11.59
+>> New best FID: 11.59 at step 26000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 26000
+Step 026500 | G:0.7376 | D:0.6675 | R1:0.0014 | R2:0.0014
+Step 027000 | G:0.8903 | D:0.6278 | R1:0.0021 | R2:0.0014
+Step 27000: FID = 11.28
+>> New best FID: 11.28 at step 27000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 27000
+Step 027500 | G:0.8998 | D:0.6182 | R1:0.0022 | R2:0.0013
+Step 028000 | G:0.7447 | D:0.6660 | R1:0.0015 | R2:0.0013
+>> Checkpoint saved at step 28000
+Step 28000: FID = 10.98
+>> New best FID: 10.98 at step 28000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 28000
+Step 028500 | G:0.7438 | D:0.6691 | R1:0.0015 | R2:0.0015
+Step 029000 | G:0.7628 | D:0.6621 | R1:0.0014 | R2:0.0013
+Step 29000: FID = 10.86
+>> New best FID: 10.86 at step 29000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 29000
+Step 029500 | G:0.7459 | D:0.6646 | R1:0.0013 | R2:0.0013
+Step 030000 | G:0.7493 | D:0.6644 | R1:0.0015 | R2:0.0012
+>> Checkpoint saved at step 30000
+Step 30000: FID = 10.61
+>> New best FID: 10.61 at step 30000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 30000
+Step 030500 | G:0.7505 | D:0.6560 | R1:0.0014 | R2:0.0012
+Step 031000 | G:0.7206 | D:0.6772 | R1:0.0014 | R2:0.0013
+Step 31000: FID = 10.46
+>> New best FID: 10.46 at step 31000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 31000
+Step 031500 | G:0.7632 | D:0.6595 | R1:0.0018 | R2:0.0012
+Step 032000 | G:0.7335 | D:0.6673 | R1:0.0014 | R2:0.0014
+>> Checkpoint saved at step 32000
+Step 32000: FID = 10.25
+>> New best FID: 10.25 at step 32000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 32000
+Step 032500 | G:0.7399 | D:0.6701 | R1:0.0013 | R2:0.0013
+Step 033000 | G:0.7456 | D:0.6614 | R1:0.0015 | R2:0.0014
+Step 33000: FID = 10.26
+Step 033500 | G:0.7640 | D:0.6711 | R1:0.0016 | R2:0.0018
+Step 034000 | G:0.7520 | D:0.6624 | R1:0.0016 | R2:0.0016
+>> Checkpoint saved at step 34000
+Step 34000: FID = 10.06
+>> New best FID: 10.06 at step 34000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 34000
+Step 034500 | G:0.7305 | D:0.6729 | R1:0.0013 | R2:0.0011
+Step 035000 | G:0.7529 | D:0.6604 | R1:0.0015 | R2:0.0014
+Step 35000: FID = 9.85
+>> New best FID: 9.85 at step 35000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 35000
+Step 035500 | G:0.7560 | D:0.6862 | R1:0.0015 | R2:0.0019
+Step 036000 | G:0.7961 | D:0.6469 | R1:0.0017 | R2:0.0014
+>> Checkpoint saved at step 36000
+Step 36000: FID = 9.80
+>> New best FID: 9.80 at step 36000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 36000
+Step 036500 | G:0.7805 | D:0.6447 | R1:0.0018 | R2:0.0018
+Step 037000 | G:0.7487 | D:0.6691 | R1:0.0017 | R2:0.0016
+Step 37000: FID = 9.71
+>> New best FID: 9.71 at step 37000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 37000
+Step 037500 | G:0.7455 | D:0.6708 | R1:0.0014 | R2:0.0014
+Step 038000 | G:0.7515 | D:0.6608 | R1:0.0017 | R2:0.0015
+>> Checkpoint saved at step 38000
+Step 38000: FID = 9.57
+>> New best FID: 9.57 at step 38000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 38000
+Step 038500 | G:0.7311 | D:0.6704 | R1:0.0014 | R2:0.0014
+Step 039000 | G:0.7340 | D:0.6684 | R1:0.0014 | R2:0.0014
+Step 39000: FID = 9.42
+>> New best FID: 9.42 at step 39000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 39000
+Step 039500 | G:0.7602 | D:0.6555 | R1:0.0016 | R2:0.0013
+Step 040000 | G:0.7449 | D:0.6634 | R1:0.0015 | R2:0.0015
+>> Checkpoint saved at step 40000
+Step 40000: FID = 9.40
+>> New best FID: 9.40 at step 40000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 40000
+Step 040500 | G:0.7679 | D:0.6479 | R1:0.0015 | R2:0.0016
+Step 041000 | G:0.7453 | D:0.6619 | R1:0.0015 | R2:0.0013
+Step 41000: FID = 9.33
+>> New best FID: 9.33 at step 41000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 41000
+Step 041500 | G:0.7349 | D:0.6676 | R1:0.0015 | R2:0.0013
+Step 042000 | G:0.7362 | D:0.6693 | R1:0.0013 | R2:0.0013
+>> Checkpoint saved at step 42000
+Step 42000: FID = 9.23
+>> New best FID: 9.23 at step 42000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 42000
+Step 042500 | G:0.7312 | D:0.6728 | R1:0.0016 | R2:0.0014
+Step 043000 | G:0.7546 | D:0.6567 | R1:0.0014 | R2:0.0013
+Step 43000: FID = 9.19
+>> New best FID: 9.19 at step 43000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 43000
+Step 043500 | G:0.7457 | D:0.6621 | R1:0.0016 | R2:0.0015
+Step 044000 | G:0.8668 | D:0.6049 | R1:0.0051 | R2:0.0015
+>> Checkpoint saved at step 44000
+Step 44000: FID = 9.16
+>> New best FID: 9.16 at step 44000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 44000
+Step 044500 | G:0.7384 | D:0.6661 | R1:0.0014 | R2:0.0013
+Step 045000 | G:0.7639 | D:0.6540 | R1:0.0017 | R2:0.0015
+Step 45000: FID = 9.10
+>> New best FID: 9.10 at step 45000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 45000
+Step 045500 | G:0.7256 | D:0.6783 | R1:0.0014 | R2:0.0014
+Step 046000 | G:0.7426 | D:0.6585 | R1:0.0015 | R2:0.0014
+>> Checkpoint saved at step 46000
+Step 46000: FID = 9.03
+>> New best FID: 9.03 at step 46000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 46000
+Step 046500 | G:0.7418 | D:0.6609 | R1:0.0015 | R2:0.0015
+Step 047000 | G:0.7841 | D:0.6436 | R1:0.0023 | R2:0.0016
+Step 47000: FID = 8.96
+>> New best FID: 8.96 at step 47000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 47000
+Step 047500 | G:0.7317 | D:0.6666 | R1:0.0015 | R2:0.0014
+Step 048000 | G:0.7446 | D:0.6585 | R1:0.0015 | R2:0.0015
+>> Checkpoint saved at step 48000
+Step 48000: FID = 9.01
+Step 048500 | G:0.7498 | D:0.6521 | R1:0.0016 | R2:0.0016
+Step 049000 | G:0.7451 | D:0.6555 | R1:0.0016 | R2:0.0015
+Step 49000: FID = 8.92
+>> New best FID: 8.92 at step 49000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 49000
+Step 049500 | G:0.7210 | D:0.6832 | R1:0.0013 | R2:0.0015
+Step 050000 | G:0.7473 | D:0.6720 | R1:0.0015 | R2:0.0017
+>> Checkpoint saved at step 50000
+Step 50000: FID = 9.00
+Step 050500 | G:0.7343 | D:0.6654 | R1:0.0015 | R2:0.0014
+Step 051000 | G:0.7446 | D:0.6549 | R1:0.0016 | R2:0.0015
+Step 51000: FID = 8.95
+Step 051500 | G:0.7257 | D:0.6704 | R1:0.0015 | R2:0.0015
+Step 052000 | G:0.7375 | D:0.6624 | R1:0.0016 | R2:0.0015
+>> Checkpoint saved at step 52000
+Step 52000: FID = 8.87
+>> New best FID: 8.87 at step 52000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 52000
+Step 052500 | G:0.7470 | D:0.6527 | R1:0.0018 | R2:0.0016
+Step 053000 | G:0.7494 | D:0.6596 | R1:0.0016 | R2:0.0015
+Step 53000: FID = 8.92
+Step 053500 | G:0.7424 | D:0.6581 | R1:0.0015 | R2:0.0013
+Step 054000 | G:0.7343 | D:0.6690 | R1:0.0015 | R2:0.0014
+>> Checkpoint saved at step 54000
+Step 54000: FID = 8.91
+Step 054500 | G:0.7186 | D:0.6797 | R1:0.0016 | R2:0.0015
+Step 055000 | G:0.7460 | D:0.6613 | R1:0.0016 | R2:0.0016
+Step 55000: FID = 8.91
+Step 055500 | G:0.7350 | D:0.6754 | R1:0.0019 | R2:0.0019
+Step 056000 | G:0.7342 | D:0.6626 | R1:0.0014 | R2:0.0013
+>> Checkpoint saved at step 56000
+Step 56000: FID = 8.86
+>> New best FID: 8.86 at step 56000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 56000
+Step 056500 | G:0.7499 | D:0.6586 | R1:0.0020 | R2:0.0019
+Step 057000 | G:0.7284 | D:0.6684 | R1:0.0015 | R2:0.0014
+Step 57000: FID = 8.80
+>> New best FID: 8.80 at step 57000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 57000
+Step 057500 | G:0.7597 | D:0.6499 | R1:0.0018 | R2:0.0016
+Step 058000 | G:0.7393 | D:0.6662 | R1:0.0016 | R2:0.0016
+>> Checkpoint saved at step 58000
+Step 58000: FID = 8.86
+Step 058500 | G:0.7455 | D:0.6570 | R1:0.0017 | R2:0.0016
+Step 059000 | G:0.7249 | D:0.6727 | R1:0.0015 | R2:0.0015
+Step 59000: FID = 8.77
+>> New best FID: 8.77 at step 59000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 59000
+Step 059500 | G:0.7611 | D:0.6483 | R1:0.0021 | R2:0.0020
+Step 060000 | G:0.7802 | D:0.6343 | R1:0.0022 | R2:0.0016
+>> Checkpoint saved at step 60000
+Step 60000: FID = 8.78
+Step 060500 | G:0.7362 | D:0.6600 | R1:0.0015 | R2:0.0015
+Step 061000 | G:0.7407 | D:0.6730 | R1:0.0015 | R2:0.0019
+Step 61000: FID = 8.78
+Step 061500 | G:0.7201 | D:0.6775 | R1:0.0015 | R2:0.0016
+Step 062000 | G:0.7429 | D:0.6605 | R1:0.0015 | R2:0.0014
+>> Checkpoint saved at step 62000
+Step 62000: FID = 8.68
+>> New best FID: 8.68 at step 62000, saved training_snapshots_64to256\best_generator_ema.pth
+>> Checkpoint saved at step 62000
+Step 062500 | G:0.7331 | D:0.6728 | R1:0.0015 | R2:0.0016
+>> Checkpoint saved at step 62500
+>> Training complete.
